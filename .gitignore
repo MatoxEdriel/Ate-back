@@ -1,0 +1,61 @@
+## ==========================================
+## .gitignore Oficial para Ate (.NET 10 + Angular)
+## ==========================================
+
+# ------------------------------------------
+# 1. Archivos de Compilación & Salida .NET
+# ------------------------------------------
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+*.user
+*.userosscache
+*.sln.docstates
+*.userprefs
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+
+# ------------------------------------------
+# 2. Entornos de Desarrollo e IDEs (.vs, VS Code, Rider)
+# ------------------------------------------
+.vs/
+.idea/
+*.swp
+*.bak
+*~
+*.DotSettings.user
+
+# ------------------------------------------
+# 3. Secretos & Archivos de Entorno (.env)
+# ------------------------------------------
+*.env
+*.env.local
+*.env.development
+*.env.production
+appsettings*.Secret.json
+appsettings.Local.json
+
+# ------------------------------------------
+# 4. Frontend & Node.js / Angular (Para cuando agreguemos Angular)
+# ------------------------------------------
+node_modules/
+dist/
+.angular/
+.npm
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ------------------------------------------
+# 5. Sistema Operativo & Temporales
+# ------------------------------------------
+[Tt]humbs.db
+[Dd]esktop.ini
+.DS_Store
+*.tmp
+*.log
