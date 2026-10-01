@@ -52,14 +52,28 @@ graph TD
 
 | Proyecto | Tipo | Referencias (`ProjectReference`) | Descripción & Responsabilidad |
 | :--- | :--- | :--- | :--- |
-| **`Ate.Domain`** | `classlib` | **Ninguna (0 dependencias)** | Contiene las entidades principales (`Empleado`, `Empresa`, `Transaccion`, `Saldo`), Enums, Value Objects y excepciones del dominio. No conoce bases de datos ni APIs. |
+| **`Ate.Domain`** | `classlib` | **Ninguna (0 dependencias)** | Contiene las entidades principales (pendientes de definir), Enums, Value Objects y excepciones del dominio. No conoce bases de datos ni APIs. |
 | **`Ate.Application`** | `classlib` | `Ate.Domain` | Contiene interfaces (`IApplicationDbContext`, `IJwtProvider`), DTOs, validaciones y servicios de casos de uso. |
 | **`Ate.Infrastructure`** | `classlib` | `Ate.Application`, `Ate.Domain` | Implementa el acceso a datos (`DbContext` con Entity Framework Core), repositorios, proveedores de tokens JWT y servicios de códigos QR. |
 | **`Ate.Api`** | `webapi` | `Ate.Application`, `Ate.Infrastructure` | Expone los endpoints HTTP REST, configura middlewares (CORS, JWT, Excepciones) y registra las dependencias en el contenedor de IoC. |
 
 ---
 
-## 🛠️ 4. Comandos de la CLI de .NET
+## 🗄️ 4. Especificación de Base de Datos & ORM
+
+* **Motor de Base de Datos:** **PostgreSQL 16 LTS** *(Versión estable recomendada para producción y desarrollo)*.
+* **ORM:** **Entity Framework Core (EF Core 10)**.
+* **Proveedor EF Core / Driver:** `Npgsql.EntityFrameworkCore.PostgreSQL` v10.0.3.
+
+### 📦 Paquetes NuGet Instalados:
+| Proyecto | Paquete NuGet | Versión | Propósito |
+| :--- | :--- | :--- | :--- |
+| **`Ate.Infrastructure`** | `Npgsql.EntityFrameworkCore.PostgreSQL` | `10.0.3` | Proveedor ORM de EF Core para conectar y mapear con PostgreSQL. |
+| **`Ate.Api`** | `Microsoft.EntityFrameworkCore.Design` | `10.0.12` | Herramientas en tiempo de diseño para la creación y ejecución de Migraciones (`dotnet ef migrations`). |
+
+---
+
+## 🛠️ 5. Comandos de la CLI de .NET & EF Core
 
 ### Compilar toda la solución:
 ```bash
@@ -71,15 +85,22 @@ dotnet build backend/Ate.slnx
 dotnet watch --project backend/Ate.Api/Ate.Api.csproj
 ```
 
-### Sintaxis para agregar una Referencia de Proyecto (`ProjectReference`):
+### Crear una nueva migración de base de datos:
 ```bash
-dotnet add <ProyectoOrigen.csproj> reference <ProyectoDestino.csproj>
+dotnet ef migrations add <NombreMigracion> --project backend/Ate.Infrastructure/Ate.Infrastructure.csproj --startup-project backend/Ate.Api/Ate.Api.csproj
+```
+
+### Aplicar migraciones a la base de datos PostgreSQL:
+```bash
+dotnet ef database update --project backend/Ate.Infrastructure/Ate.Infrastructure.csproj --startup-project backend/Ate.Api/Ate.Api.csproj
 ```
 
 ---
 
-## 🎯 5. Reglas de Desarrollo para Desarrolladores & IA
+## 🎯 6. Reglas de Desarrollo para Desarrolladores & IA
 
-1. **Inversión de Dependencias:** La capa `Ate.Application` define las **interfaces**, y `Ate.Infrastructure` implementa dichas interfaces.
+1. **Inversión de Dependencias:** La capa `Ate.Application` define las **interfaces**, y `Ate.Infrastructure` implementa dichas interfaces (`AteDbContext`).
 2. **Sin dependencias circulares:** Ningún proyecto de capa interna (`Domain` o `Application`) puede hacer referencia a capas externas (`Infrastructure` o `Api`).
 3. **Estilo de Código:** Utilizar **TypeScript/C# con tipado estricto**, manejo de nulos habilitado (`<Nullable>enable</Nullable>`) y registros `record` o clases inmutables cuando aplique.
+4. **Convención de Base de Datos:** Todos los nombres de tablas, columnas, índices y restricciones **DEBEN estar en INGLÉS**.
+
