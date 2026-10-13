@@ -791,3 +791,59 @@ Existe en `d:\Ate\docker-compose.yml` **y** en `d:\Ate\backend\docker-compose.ym
 | **Repositorio** | Clase que encapsula el acceso a datos. En lugar de que el servicio use `DbContext` directamente, llama a `repository.GetById(id)`. |
 | **Middleware** | Componente que intercepta cada HTTP request/response en el pipeline de ASP.NET. Ejemplo: autenticación, logging, manejo de errores. |
 | **Connection string** | Cadena de texto que le dice a EF Core cómo conectarse a la base de datos: servidor, puerto, nombre de BD, usuario y contraseña. |
+
+---
+
+## 11. Estrategia de Identidad, Autenticación y UUIDv7
+
+### 11.1 ¿Por qué UUIDv7? (RFC 9562)
+
+En **Ate**, todas las entidades de dominio y usuarios utilizan **UUIDv7** como clave primaria técnica en lugar de números secuenciales (`BIGINT`) o `UUIDv4` tradicional:
+
+```
+┌───────────────────────────────────────┬──────────────────────────────────────┐
+│  Primeros 48 bits: TIMESTAMP UTC      │  Siguientes 74 bits: ALEATORIEDAD    │
+│  (Garantiza orden cronológico)        │  (Garantiza unicidad global)         │
+└───────────────────────────────────────┴──────────────────────────────────────┘
+```
+
+#### Ventajas frente a `BIGINT` (1, 2, 3...):
+* **Seguridad (Prevención de IDOR):** Nadie puede adivinar o iterar registros en la API (`/api/employees/1`, `/api/employees/2`).
+* **Protección de métricas de negocio:** No revela volumen comercial ni cantidad de clientes a competidores.
+* **Generación en la aplicación:** .NET 10 puede instanciar el ID antes de enviar el INSERT a la base de datos (`Guid.CreateVersion7()`), simplificando operaciones complejas y transacciones en memoria.
+
+#### Ventajas frente a `UUIDv4` (aleatorio tradicional):
+* **Cero fragmentación en índices B-Tree de PostgreSQL:** Al estar ordenado por tiempo, PostgreSQL inserta secuencialmente al final de la página del índice en disco, alcanzando la misma velocidad de inserción que un autoincrementable.
+
+---
+
+### 11.2 Arquitectura de Identidad Desacoplada
+
+Se implementó el patrón de **3 capas de identidad**:
+
+```
+[users] (Autenticación & Seguridad)
+  │
+  ├── 1:1 ──► [persons] (Identidad Civil: Cédula, Nombres, Teléfono)
+  │             │
+  │             └── 1:N ──► [employees] (Vínculo con la Empresa y token QR)
+  │
+  ├── N:M ──► [roles] (SuperAdmin, CompanyAdmin, Employee, Merchant)
+  ├── 1:N ──► [refresh_tokens] (Sesión persistente y revocación JWT)
+  └── 1:N ──► [user_external_logins] (Preparado para Active Directory / Azure AD)
+```
+
+1. **Login Universal (Cédula o Email):**
+   * Empleados operativos inician sesión con su **Cédula** (`persons.document_number`).
+   * Administradores y RRHH inician sesión con su **Email** (`users.email`).
+2. **Federación con Active Directory (Azure AD / Entra ID):**
+   * `users.password_hash` es `NULLABLE` para soportar SSO corporativo.
+   * La tabla `user_external_logins` vincula el `Object ID` devuelto por Microsoft con el `user_id` de Ate.
+3. **Manejo del Tiempo:**
+   * Todas las columnas de fecha usan `TIMESTAMPTZ` en PostgreSQL y `DateTimeOffset` en C# (UTC).
+4. **Auditoría Universal (`IAuditableEntity`):**
+   * Todas las entidades de negocio implementan `IAuditableEntity` con 7 columnas: `created_at`, `created_by`, `updated_at`, `updated_by`, `is_deleted`, `deleted_at`, `deleted_by`.
+   * El `AteDbContext` gestiona automáticamente los timestamps y el borrado lógico (Soft Delete).
+5. **Seeder Inicial:**
+   * En `AteDbSeeder.cs`, se siembran los 4 roles base y la cuenta SuperAdmin inicial (`admin@ate.com` / `Admin123*Ate`) vinculada a su respectiva persona con documento `0000000000`.
+
