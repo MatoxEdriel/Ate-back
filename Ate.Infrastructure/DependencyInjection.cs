@@ -20,7 +20,7 @@ public static class DependencyInjection
         var dataSource = NpgsqlDataSource.Create(connectionString);
         services.AddSingleton(dataSource);
 
-        services.AddDbContextPool<AteDbContext>(options =>
+        services.AddDbContext<AteDbContext>(options =>
         {
             options.UseNpgsql(dataSource)
                    .UseSnakeCaseNamingConvention();
