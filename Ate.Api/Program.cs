@@ -5,7 +5,20 @@ using Ate.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddApiServices();
+const string corsPolicyName = "FrontendCorsPolicy";
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy(corsPolicyName, policy =>
+    {
+        policy.WithOrigins("http://localhost:4200", "http://localhost:3000")
+              .AllowAnyHeader()
+              .AllowAnyMethod()
+              .AllowCredentials();
+    });
+});
+
+builder.Services.AddControllers();
+builder.Services.AddApiServices(builder.Configuration);
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
@@ -13,7 +26,13 @@ var app = builder.Build();
 
 await app.InitialiseDatabaseAsync();
 
+app.UseCors(corsPolicyName);
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseScalarDocumentation();
+
+app.MapControllers();
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy", timestamp = DateTimeOffset.UtcNow }))
    .WithName("HealthCheck")

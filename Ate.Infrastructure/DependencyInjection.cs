@@ -1,8 +1,10 @@
+using Ate.Application.Common.Constants;
 using Ate.Application.Common.Interfaces;
 using Ate.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 
 namespace Ate.Infrastructure;
 
@@ -12,11 +14,17 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("DefaultConnection");
+        var connectionString = configuration.GetConnectionString(ConfigurationConstants.ConnectionStrings.DefaultConnection)
+            ?? throw new InvalidOperationException($"Connection string '{ConfigurationConstants.ConnectionStrings.DefaultConnection}' was not found.");
+
+        var dataSource = NpgsqlDataSource.Create(connectionString);
+        services.AddSingleton(dataSource);
 
         services.AddDbContext<AteDbContext>(options =>
-            options.UseNpgsql(connectionString)
-                   .UseSnakeCaseNamingConvention());
+        {
+            options.UseNpgsql(dataSource)
+                   .UseSnakeCaseNamingConvention();
+        });
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<AteDbContext>());
 
