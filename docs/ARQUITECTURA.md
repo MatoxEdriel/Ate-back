@@ -847,3 +847,28 @@ Se implementó el patrón de **3 capas de identidad**:
 5. **Seeder Inicial:**
    * En `AteDbSeeder.cs`, se siembran los 4 roles base y la cuenta SuperAdmin inicial (`admin@ate.com` / `Admin123*Ate`) vinculada a su respectiva persona con documento `0000000000`.
 
+### 11.3 Manejo Estándar de Errores: Result Pattern & Global Exception Handler
+
+Se eliminó el antipatrón de lanzar excepciones para flujos de negocio esperados o validaciones. El sistema divide los fallos en dos canales:
+
+1. **Errores de Dominio / Negocio (Esperados) — `Result<T>`:**
+   * Ubicación: `Ate.Domain.Common` (`Result`, `Result<T>`, `Error`, `ErrorType`).
+   * Casos de uso y servicios no lanzan `throw new Exception`. En su lugar retornan `Result.Failure<T>(Error)`.
+   * Los errores se clasifican con `ErrorType`:
+     * `NotFound` (404)
+     * `Validation` (400)
+     * `Unauthorized` (401)
+     * `Forbidden` (403)
+     * `Conflict` (409)
+     * `Failure` (422/400)
+   * **Cero clases basura:** Se evita crear clases estáticas dedicadas por cada entidad (`CompanyErrors`, `ProductErrors`). En su lugar, se usan los métodos genéricos en `Error`:
+     * `Error.NotFound<Company>(id)` ➔ Genera código `"Company.NotFound"` y descripción `"Company with identifier '{id}' was not found."`
+     * `Error.Conflict<Company>("RUC", ruc)` ➔ Genera código `"Company.Conflict"` y descripción `"Company with RUC '{ruc}' already exists."`
+   * Los controladores mapean directamente mediante el método de extensión `result.ToActionResult(this)` hacia la estructura unificada `ApiResponse<T>`.
+
+2. **Errores de Sistema / Infraestructura (Inesperados) — `GlobalExceptionHandler`:**
+   * Implementa `IExceptionHandler` de ASP.NET Core (`Ate.Api.Middlewares.GlobalExceptionHandler`).
+   * Captura cualquier excepción no controlada (errores 500, caídas de base de datos, excepciones de runtime).
+   * Registra el error en logs y devuelve un `ApiResponse<object>.FailureResponse(...)` con código HTTP 500, protegiendo trazas sensibles en entornos de producción.
+
+

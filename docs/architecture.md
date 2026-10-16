@@ -104,3 +104,52 @@ dotnet ef database update --project backend/Ate.Infrastructure/Ate.Infrastructur
 3. **Estilo de Código:** Utilizar **TypeScript/C# con tipado estricto**, manejo de nulos habilitado (`<Nullable>enable</Nullable>`) y registros `record` o clases inmutables cuando aplique.
 4. **Convención de Base de Datos:** Todos los nombres de tablas, columnas, índices y restricciones **DEBEN estar en INGLÉS**.
 
+---
+
+## 🛡️ 7. Manejo Estándar de Errores & Lógica de Negocio
+
+El backend de **Ate** implementa la mejor práctica de la industria para el control de errores, dividiéndolos estrictamente en dos categorías:
+
+### 1. Errores Esperados (Negocio, No Encontrado, Validación, Autorización)
+* **Patrón Utilizado:** **Result Pattern** (*Railway-Oriented Programming*).
+* **Ubicación:** `Ate.Domain.Common` (`Result`, `Result<T>`, `Error`, `ErrorType`).
+* **Regla:** **PROHIBIDO** lanzar excepciones (`throw new ...`) para flujos esperados de negocio o validación (ej. usuario no existe, contraseña incorrecta, saldo insuficiente). Todo caso de uso o servicio debe retornar `Task<Result<T>>` o `Task<Result>`.
+
+#### Categorías de Errores (`ErrorType`):
+| Tipo (`ErrorType`) | Código HTTP | Descripción | Ejemplo de Código |
+| :--- | :--- | :--- | :--- |
+| **`NotFound`** | `404 Not Found` | El recurso solicitado no existe en el sistema. | `Error.NotFound<Company>(id)` |
+| **`Validation`** | `400 Bad Request` | Carga útil o campos con datos inválidos o faltantes. | `Error.Validation<User>("Invalid format")` |
+| **`Unauthorized`** | `401 Unauthorized` | Fallo de identidad o credenciales erróneas. | `AuthErrors.InvalidCredentials` |
+| **`Forbidden`** | `403 Forbidden` | Identidad válida pero estado bloqueado o inactivo. | `AuthErrors.UserInactive` |
+| **`Conflict`** | `409 Conflict` | Conflicto de estado (ej. duplicidad de documento/cédula/RUC). | `Error.Conflict<Company>("RUC", ruc)` |
+| **`Failure`** | `422 Unprocessable` / `400` | Violación de regla o invariante de negocio. | `Error.Failure("Code", "Description")` |
+
+#### 💡 Fábrica Genérica Reutilizable (Cero Clases Basura):
+Para evitar crear clases estáticas dedicadas por cada entidad (`CompanyErrors`, `ProductErrors`), se utilizan las fábricas genéricas directamente en `Error`:
+* `Error.NotFound<TEntity>(id)` ➔ Genera: Code: `"Company.NotFound"`, Description: `"Company with identifier '123' was not found."`
+* `Error.NotFound(name, id)` ➔ Mismo comportamiento pasando el nombre como string.
+* `Error.Conflict<TEntity>(field, value)` ➔ Genera: Code: `"User.Conflict"`, Description: `"User with DocumentNumber '12345' already exists."`
+
+#### Mapeo a HTTP y `ApiResponse<T>`:
+En la capa de API (`Ate.Api.Controllers`), se utiliza la extensión `result.ToActionResult(this)`:
+```csharp
+[HttpPost("login")]
+public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
+{
+    var result = await _authService.LoginAsync(request, cancellationToken);
+    return result.ToActionResult(this, "User authenticated successfully.");
+}
+```
+
+---
+
+### 2. Errores Inesperados (Crashes, Caídas de Base de Datos, Fallos de Red)
+* **Patrón Utilizado:** **Global Exception Handler** nativo de .NET (`IExceptionHandler`).
+* **Ubicación:** `Ate.Api.Middlewares.GlobalExceptionHandler`.
+* **Registro:** Configurado en `DependencyInjection.cs` y activado en `Program.cs` con `app.UseExceptionHandler()`.
+* **Comportamiento:**
+  * En desarrollo: expone el mensaje y tipo de excepción en el array de errores de `ApiResponse<T>`.
+  * En producción: oculta detalles sensibles del sistema y retorna de manera segura `HTTP 500 Internal Server Error` con el contrato unificado `ApiResponse<object>.FailureResponse("An unexpected server error occurred. Please try again later.")`.
+
+

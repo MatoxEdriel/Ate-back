@@ -1,7 +1,9 @@
 using System.Security.Claims;
+using Ate.Api.Extensions;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Common.Models;
 using Ate.Application.Features.Auth.DTOs;
+using Ate.Domain.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -27,30 +29,11 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.DocumentNumber) || string.IsNullOrWhiteSpace(request.Password))
-        {
-            var errors = new List<string>();
-            if (string.IsNullOrWhiteSpace(request.DocumentNumber))
-            {
-                errors.Add("Document number (cédula) is required.");
-            }
-            if (string.IsNullOrWhiteSpace(request.Password))
-            {
-                errors.Add("Password is required.");
-            }
-
-            return BadRequest(ApiResponse<LoginResponse>.FailureResponse("Validation failed for login payload.", errors));
-        }
-
-        var response = await _authService.LoginAsync(request, cancellationToken);
-        if (response == null)
-        {
-            return Unauthorized(ApiResponse<LoginResponse>.FailureResponse("Invalid document number or password."));
-        }
-
-        return Ok(ApiResponse<LoginResponse>.SuccessResponse(response, "User authenticated successfully."));
+        var result = await _authService.LoginAsync(request, cancellationToken);
+        return result.ToActionResult(this, "User authenticated successfully.");
     }
 
     [HttpGet("me")]
@@ -68,7 +51,7 @@ public class AuthController : ControllerBase
 
         if (string.IsNullOrEmpty(userId))
         {
-            return Unauthorized(ApiResponse<object>.FailureResponse("User identity could not be verified from token."));
+            return ResultExtensions.ToErrorActionResult<object>(AuthErrors.InvalidToken, this);
         }
 
         var profile = new

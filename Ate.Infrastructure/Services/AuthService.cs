@@ -1,6 +1,8 @@
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Features.Auth.DTOs;
+using Ate.Domain.Common;
 using Ate.Domain.Entities;
+using Ate.Domain.Errors;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ate.Infrastructure.Services;
@@ -24,11 +26,21 @@ public class AuthService : IAuthService, IScopedDependency
         _dateTimeProvider = dateTimeProvider;
     }
 
-    public async Task<LoginResponse?> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
+    public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(request.DocumentNumber) || string.IsNullOrWhiteSpace(request.Password))
         {
-            return null;
+            var errors = new List<string>();
+            if (string.IsNullOrWhiteSpace(request.DocumentNumber))
+            {
+                errors.Add("Document number (cédula) is required.");
+            }
+            if (string.IsNullOrWhiteSpace(request.Password))
+            {
+                errors.Add("Password is required.");
+            }
+
+            return Result.Failure<LoginResponse>(Error.Validation("Auth.MissingCredentials", "Validation failed for login payload.", errors));
         }
 
         var normalizedDocumentNumber = request.DocumentNumber.Trim();
@@ -40,15 +52,25 @@ public class AuthService : IAuthService, IScopedDependency
                 .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => !u.IsDeleted && u.Person != null && u.Person.DocumentNumber == normalizedDocumentNumber, cancellationToken);
 
-        if (user == null || !user.IsActive || string.IsNullOrEmpty(user.PasswordHash))
+        if (user == null)
         {
-            return null;
+            return Result.Failure<LoginResponse>(AuthErrors.InvalidCredentials);
+        }
+
+        if (!user.IsActive)
+        {
+            return Result.Failure<LoginResponse>(AuthErrors.UserInactive);
+        }
+
+        if (string.IsNullOrEmpty(user.PasswordHash))
+        {
+            return Result.Failure<LoginResponse>(AuthErrors.InvalidCredentials);
         }
 
         var isValidPassword = _passwordHasher.VerifyPassword(request.Password, user.PasswordHash);
         if (!isValidPassword)
         {
-            return null;
+            return Result.Failure<LoginResponse>(AuthErrors.InvalidCredentials);
         }
 
         var roles = user.UserRoles
@@ -91,6 +113,6 @@ public class AuthService : IAuthService, IScopedDependency
             user.Person?.AvatarUrl,
             roles);
 
-        return new LoginResponse(accessToken, refreshTokenString, expiresAt, userDto);
+        return Result.Success(new LoginResponse(accessToken, refreshTokenString, expiresAt, userDto));
     }
 }

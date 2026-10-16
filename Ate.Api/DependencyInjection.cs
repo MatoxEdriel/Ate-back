@@ -1,4 +1,5 @@
 using System.Text;
+using Ate.Api.Middlewares;
 using Ate.Api.Services;
 using Ate.Application.Common.Constants;
 using Ate.Application.Common.Interfaces;
@@ -13,6 +14,8 @@ public static class DependencyInjection
     {
         services.AddOpenApi();
         services.AddHttpContextAccessor();
+        services.AddExceptionHandler<GlobalExceptionHandler>();
+        services.AddProblemDetails();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
 
         var jwtSection = configuration.GetSection(ConfigurationConstants.JwtSettings.SectionName);
