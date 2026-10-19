@@ -152,4 +152,46 @@ public async Task<IActionResult> Login([FromBody] LoginRequest request, Cancella
   * En desarrollo: expone el mensaje y tipo de excepción en el array de errores de `ApiResponse<T>`.
   * En producción: oculta detalles sensibles del sistema y retorna de manera segura `HTTP 500 Internal Server Error` con el contrato unificado `ApiResponse<object>.FailureResponse("An unexpected server error occurred. Please try again later.")`.
 
+---
+
+## 🧩 8. Convenciones de Código Limpio (Anti "Utils" y Cero Strings Mágicos)
+
+Para mantener la arquitectura limpia y evitar clases "cajón de sastre" (`Utils/`), se aplican los siguientes patrones en el backend:
+
+### 1. Extracción Segura de Claims (`ClaimsPrincipalExtensions`)
+* Ubicación: `Ate.Api.Extensions.ClaimsPrincipalExtensions`
+* Prohibido extraer claims manualmente con `ClaimTypes.NameIdentifier` o `User.FindFirstValue(...)`.
+* Métodos tipados disponibles en cualquier Controller o Middleware:
+  * `User.GetUserId()` ➔ Retorna `Guid?` (parseado con seguridad desde `sub` o `NameIdentifier`).
+  * `User.GetEmail()` ➔ Retorna el correo del usuario autenticado.
+  * `User.GetFullName()` ➔ Retorna el nombre completo de la persona.
+  * `User.GetDocumentNumber()` ➔ Retorna la cédula / documento de identidad (`document_number`).
+  * `User.GetPersonId()` ➔ Retorna el ID de la persona (`person_id`).
+  * `User.GetRoles()` ➔ Retorna `IReadOnlyList<string>` sin duplicados.
+  * `User.IsSuperAdmin()`, `User.IsCompanyAdmin()`, `User.IsEmployee()`, `User.IsMerchant()`.
+
+### 2. Roles y Claims Fuertemente Tipados
+* Ubicación: `Ate.Domain.Constants.RoleConstants` y `Ate.Domain.Constants.CustomClaimTypes`.
+* Prohibido quemar `"SuperAdmin"` o nombres de claims en texto plano.
+* Uso en atributos: `[Authorize(Roles = RoleConstants.SuperAdmin)]`.
+
+### 3. Configuración Fuertemente Tipada (Options Pattern con Validación)
+* Ubicación: `Ate.Infrastructure.Services.JwtOptions`.
+* En lugar de leer strings con `Configuration["JwtSettings:SecretKey"]`, se usa `IOptions<JwtOptions>` con `[Required]`, `[MinLength]` y validación al iniciar (`ValidateDataAnnotations().ValidateOnStart()`).
+* Si falta alguna variable de entorno en Docker, la aplicación falla de inmediato en el arranque informando el error exacto.
+
+### 4. Paginación y Filtrado Estándar
+* Ubicación: `Ate.Application.Common.Models.PagedResult<T>`, `PaginationParams` y `QueryableExtensions`.
+* Para paginar cualquier consulta de EF Core:
+  ```csharp
+  var pagedList = await query
+      .WhereIf(!string.IsNullOrEmpty(searchTerm), x => x.Name.Contains(searchTerm))
+      .ToPagedResultAsync(paginationParams, cancellationToken);
+  ```
+
+### 5. Validación Declarativa con FluentValidation
+* Ubicación: `Ate.Application` (`AbstractValidator<T>`).
+* Las validaciones de payload viven en clases dedicadas (`LoginRequestValidator`, etc.) y se inyectan como `IValidator<T>`, manteniendo los servicios libres de validaciones manuales con `if`.
+
+
 

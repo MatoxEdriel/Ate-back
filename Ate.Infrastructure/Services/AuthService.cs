@@ -3,6 +3,7 @@ using Ate.Application.Features.Auth.DTOs;
 using Ate.Domain.Common;
 using Ate.Domain.Entities;
 using Ate.Domain.Errors;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 
 namespace Ate.Infrastructure.Services;
@@ -13,33 +14,28 @@ public class AuthService : IAuthService, IScopedDependency
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IValidator<LoginRequest> _loginValidator;
 
     public AuthService(
         IApplicationDbContext context,
         IPasswordHasher passwordHasher,
         IJwtTokenGenerator jwtTokenGenerator,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IValidator<LoginRequest> loginValidator)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _jwtTokenGenerator = jwtTokenGenerator;
         _dateTimeProvider = dateTimeProvider;
+        _loginValidator = loginValidator;
     }
 
     public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(request.DocumentNumber) || string.IsNullOrWhiteSpace(request.Password))
+        var validationResult = await _loginValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
         {
-            var errors = new List<string>();
-            if (string.IsNullOrWhiteSpace(request.DocumentNumber))
-            {
-                errors.Add("Document number (cédula) is required.");
-            }
-            if (string.IsNullOrWhiteSpace(request.Password))
-            {
-                errors.Add("Password is required.");
-            }
-
+            var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
             return Result.Failure<LoginResponse>(Error.Validation("Auth.MissingCredentials", "Validation failed for login payload.", errors));
         }
 

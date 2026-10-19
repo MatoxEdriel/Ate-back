@@ -1,4 +1,5 @@
 using Ate.Application.Common.Interfaces;
+using Ate.Domain.Constants;
 using Ate.Domain.Entities;
 using Ate.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -17,10 +18,10 @@ public static class AteDbSeeder
     {
         var roles = new[]
         {
-            new Role { Id = 1, Name = "SuperAdmin", Description = "Platform super administrator" },
-            new Role { Id = 2, Name = "CompanyAdmin", Description = "Company client administrator" },
-            new Role { Id = 3, Name = "Employee", Description = "Company employee" },
-            new Role { Id = 4, Name = "Merchant", Description = "Affiliated merchant" }
+            new Role { Id = 1, Name = RoleConstants.SuperAdmin, Description = "Platform super administrator" },
+            new Role { Id = 2, Name = RoleConstants.CompanyAdmin, Description = "Company client administrator" },
+            new Role { Id = 3, Name = RoleConstants.Employee, Description = "Company employee" },
+            new Role { Id = 4, Name = RoleConstants.Merchant, Description = "Affiliated merchant" }
         };
 
         foreach (var role in roles)

@@ -1,6 +1,7 @@
 using Ate.Application.Common.Constants;
 using Ate.Application.Common.Interfaces;
 using Ate.Infrastructure.Persistence;
+using Ate.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,11 @@ public static class DependencyInjection
         this IServiceCollection services,
         IConfiguration configuration)
     {
+        services.AddOptions<JwtOptions>()
+            .Bind(configuration.GetSection(JwtOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         var connectionString = configuration.GetConnectionString(ConfigurationConstants.ConnectionStrings.DefaultConnection)
             ?? throw new InvalidOperationException($"Connection string '{ConfigurationConstants.ConnectionStrings.DefaultConnection}' was not found.");
 

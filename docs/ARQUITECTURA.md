@@ -871,4 +871,26 @@ Se eliminó el antipatrón de lanzar excepciones para flujos de negocio esperado
    * Captura cualquier excepción no controlada (errores 500, caídas de base de datos, excepciones de runtime).
    * Registra el error en logs y devuelve un `ApiResponse<object>.FailureResponse(...)` con código HTTP 500, protegiendo trazas sensibles en entornos de producción.
 
+### 11.4 Arquitectura Anti-Utils: Claims, Roles, Opciones, Paginación y Validación
+
+Se establecieron 5 pilares para erradicar el código "cajón de sastre" (`Utils/`) y eliminar cadenas mágicas:
+
+1. **Extracción Segura de Claims (`ClaimsPrincipalExtensions`):**
+   * Ubicación: `Ate.Api.Extensions.ClaimsPrincipalExtensions`.
+   * Provee métodos de extensión null-safe para controladores y servicios: `User.GetUserId()`, `User.GetEmail()`, `User.GetFullName()`, `User.GetDocumentNumber()`, `User.GetRoles()`, etc.
+   * Emite en el JWT tanto claims estándar (`sub`, `email`, `jti`, `name`, `role`) como de dominio (`document_number`, `person_id`).
+2. **Constantes Fuertemente Tipadas de Roles y Claims:**
+   * Ubicación: `Ate.Domain.Constants.RoleConstants` y `Ate.Domain.Constants.CustomClaimTypes`.
+   * Previene errores de tipeo en atributos `[Authorize(Roles = RoleConstants.SuperAdmin)]`.
+3. **Options Pattern con Validación Temprana (`JwtOptions`):**
+   * Ubicación: `Ate.Infrastructure.Services.JwtOptions`.
+   * Validado en el arranque del sistema (`ValidateDataAnnotations().ValidateOnStart()`), garantizando que la aplicación no levante si falta alguna clave secreta o configuración requerida.
+4. **Paginación y Filtrado Genérico (`PagedResult<T>`, `QueryableExtensions`):**
+   * Ubicación: `Ate.Application.Common.Models.PagedResult<T>` y `Ate.Application.Common.Extensions.QueryableExtensions`.
+   * Provee métodos como `query.ToPagedResultAsync(paginationParams, ct)` y `query.WhereIf(condition, predicate)` para consultas limpias de EF Core.
+5. **Validación Declarativa con FluentValidation:**
+   * Ubicación: `Ate.Application`.
+   * Escaneo automático de validadores en el ensamblado (`AddValidatorsFromAssembly`), desacoplando las reglas de formato de la lógica de los servicios.
+
+
 

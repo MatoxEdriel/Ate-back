@@ -44,22 +44,19 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     public IActionResult GetCurrentUser()
     {
-        var userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var email = User.FindFirstValue(ClaimTypes.Email);
-        var fullName = User.FindFirstValue(ClaimTypes.Name);
-        var roles = User.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
-
-        if (string.IsNullOrEmpty(userId))
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
         {
             return ResultExtensions.ToErrorActionResult<object>(AuthErrors.InvalidToken, this);
         }
 
         var profile = new
         {
-            id = Guid.Parse(userId),
-            email = email ?? string.Empty,
-            fullName = fullName ?? string.Empty,
-            roles
+            id = userId.Value,
+            email = User.GetEmail(),
+            fullName = User.GetFullName(),
+            documentNumber = User.GetDocumentNumber(),
+            roles = User.GetRoles()
         };
 
         return Ok(ApiResponse<object>.SuccessResponse(profile, "User profile retrieved successfully."));

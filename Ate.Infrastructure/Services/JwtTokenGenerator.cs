@@ -2,43 +2,38 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
-using Ate.Application.Common.Constants;
 using Ate.Application.Common.Interfaces;
+using Ate.Domain.Constants;
 using Ate.Domain.Entities;
-using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Ate.Infrastructure.Services;
 
 public class JwtTokenGenerator : IJwtTokenGenerator, ISingletonDependency
 {
-    private readonly IConfiguration _configuration;
+    private readonly JwtOptions _jwtOptions;
     private readonly IDateTimeProvider _dateTimeProvider;
 
-    public JwtTokenGenerator(IConfiguration configuration, IDateTimeProvider dateTimeProvider)
+    public JwtTokenGenerator(IOptions<JwtOptions> jwtOptions, IDateTimeProvider dateTimeProvider)
     {
-        _configuration = configuration;
+        _jwtOptions = jwtOptions.Value;
         _dateTimeProvider = dateTimeProvider;
     }
 
     public (string Token, DateTimeOffset ExpiresAt) GenerateToken(User user, IReadOnlyList<string> roles)
     {
-        var section = _configuration.GetSection(ConfigurationConstants.JwtSettings.SectionName);
-        var secretKey = section[ConfigurationConstants.JwtSettings.SecretKey]
-            ?? throw new InvalidOperationException("JWT SecretKey is not configured.");
-        var issuer = section[ConfigurationConstants.JwtSettings.Issuer] ?? "Ate.Api";
-        var audience = section[ConfigurationConstants.JwtSettings.Audience] ?? "Ate.Client";
-        var expirationMinutes = int.TryParse(section[ConfigurationConstants.JwtSettings.ExpirationInMinutes], out var minutes) ? minutes : 480;
-
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtOptions.SecretKey));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var expiresAt = _dateTimeProvider.UtcNow.AddMinutes(expirationMinutes);
+        var expiresAt = _dateTimeProvider.UtcNow.AddMinutes(_jwtOptions.ExpirationInMinutes);
 
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.Id.ToString()),
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(ClaimTypes.Email, user.Email ?? string.Empty),
+            new(JwtRegisteredClaimNames.Email, user.Email ?? string.Empty),
             new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
@@ -49,6 +44,13 @@ public class JwtTokenGenerator : IJwtTokenGenerator, ISingletonDependency
             {
                 claims.Add(new Claim(ClaimTypes.Name, fullName));
             }
+
+            if (!string.IsNullOrWhiteSpace(user.Person.DocumentNumber))
+            {
+                claims.Add(new Claim(CustomClaimTypes.DocumentNumber, user.Person.DocumentNumber));
+            }
+
+            claims.Add(new Claim(CustomClaimTypes.PersonId, user.Person.Id.ToString()));
         }
 
         foreach (var role in roles)
@@ -60,8 +62,8 @@ public class JwtTokenGenerator : IJwtTokenGenerator, ISingletonDependency
         {
             Subject = new ClaimsIdentity(claims),
             Expires = expiresAt.UtcDateTime,
-            Issuer = issuer,
-            Audience = audience,
+            Issuer = _jwtOptions.Issuer,
+            Audience = _jwtOptions.Audience,
             SigningCredentials = credentials
         };
 
