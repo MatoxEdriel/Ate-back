@@ -16,10 +16,12 @@ namespace Ate.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
+    private readonly IWebHostEnvironment _environment;
 
-    public AuthController(IAuthService authService)
+    public AuthController(IAuthService authService, IWebHostEnvironment environment)
     {
         _authService = authService;
+        _environment = environment;
     }
 
     [HttpPost("login")]
@@ -60,5 +62,40 @@ public class AuthController : ControllerBase
         };
 
         return Ok(ApiResponse<object>.SuccessResponse(profile, "User profile retrieved successfully."));
+    }
+
+    [HttpPost("dev-token")]
+    [AllowAnonymous]
+    [EndpointSummary("Generate development bypass token")]
+    [EndpointDescription("Generates a valid JWT access token for local development and endpoint testing without requiring credentials.")]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GenerateDevToken([FromBody] DevTokenRequest? request, CancellationToken cancellationToken)
+    {
+        if (!_environment.IsDevelopment())
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<LoginResponse>.FailureResponse("Development bypass token generation is only allowed in Development environment."));
+        }
+
+        var result = await _authService.GenerateDevTokenAsync(request, cancellationToken);
+        return result.ToActionResult(this, "Development token generated successfully.");
+    }
+
+    [HttpGet("dev-token")]
+    [AllowAnonymous]
+    [EndpointSummary("Generate development bypass token (quick GET)")]
+    [EndpointDescription("Quick GET endpoint to retrieve a valid development JWT access token with default or specified role.")]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetDevToken([FromQuery] string? role, [FromQuery] string? email, CancellationToken cancellationToken)
+    {
+        if (!_environment.IsDevelopment())
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<LoginResponse>.FailureResponse("Development bypass token generation is only allowed in Development environment."));
+        }
+
+        var request = new DevTokenRequest(role, email);
+        var result = await _authService.GenerateDevTokenAsync(request, cancellationToken);
+        return result.ToActionResult(this, "Development token generated successfully.");
     }
 }

@@ -892,5 +892,22 @@ Se establecieron 5 pilares para erradicar el código "cajón de sastre" (`Utils/
    * Ubicación: `Ate.Application`.
    * Escaneo automático de validadores en el ensamblado (`AddValidatorsFromAssembly`), desacoplando las reglas de formato de la lógica de los servicios.
 
+### 11.5 Política de Evolución de Base de Datos y Portabilidad de Seeds (Fase MVP)
+
+Para garantizar agilidad y portabilidad total entre entornos sin la sobrecarga de migraciones intermedias:
+
+1. **Cero Migraciones de EF Core en MVP:**
+   * Queda estrictamente prohibido generar migraciones incrementales (`dotnet ef migrations add ...`) durante la fase inicial de desarrollo.
+2. **Fuente Única de Esquema DDL (`backend/database/01_init_schema.sql`):**
+   * Cualquier nueva tabla, columna, relación, clave foránea o índice se refleja de forma declarativa y directa en este archivo.
+3. **Seeds Portables e Idempotentes (`backend/database/02_seed_data.sql`):**
+   * Todo cambio estructural que requiera datos iniciales (roles, usuarios administradores, empresas tenant) debe incluir sus `INSERT` idempotentes (`ON CONFLICT DO NOTHING`).
+   * Permite que cualquier desarrollador o servidor copie y pegue el script en PostgreSQL/Docker y el entorno quede 100% operativo al instante.
+4. **Sincronización en Runtime (`AteDbSeeder.cs`):**
+   * El seeder de C# en `Ate.Infrastructure.Persistence.AteDbSeeder` se mantiene sincronizado para poblar la base de datos automáticamente al levantar la API en desarrollo.
+5. **Garantía Multi-Tenancy (`company_id`):**
+   * Toda tabla transaccional y operativa dependiente de empresas debe incluir `company_id UUID NOT NULL` referenciando a `companies(id)`.
+
+
 
 

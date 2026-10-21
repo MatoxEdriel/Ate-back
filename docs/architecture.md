@@ -193,5 +193,12 @@ Para mantener la arquitectura limpia y evitar clases "cajón de sastre" (`Utils/
 * Ubicación: `Ate.Application` (`AbstractValidator<T>`).
 * Las validaciones de payload viven en clases dedicadas (`LoginRequestValidator`, etc.) y se inyectan como `IValidator<T>`, manteniendo los servicios libres de validaciones manuales con `if`.
 
+### 6. Política de Evolución de Base de Datos y Seeds Portables (Fase MVP)
+* **Sin Migraciones EF Core:** En fase MVP no se generan migraciones para evitar conflictos de ramas y acumulación de archivos descartables.
+* **DDL Centralizado (`backend/database/01_init_schema.sql`):** Toda tabla, columna, relación e índice se mantiene aquí como fuente de verdad.
+* **Seeds Idempotentes (`backend/database/02_seed_data.sql`):** Todo dato inicial de prueba usa `ON CONFLICT DO NOTHING`, listo para copiar y pegar en cualquier ambiente (Local, Docker, Servidor Cloud).
+* **Seeder en Código (`AteDbSeeder.cs`):** Sincronizado para poblar datos automáticamente al arrancar la API.
+* **Multi-Tenancy (`company_id`):** Obligatorio en todas las tablas transaccionales de empresas cliente.
+
 
 

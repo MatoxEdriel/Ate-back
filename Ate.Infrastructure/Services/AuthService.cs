@@ -1,6 +1,7 @@
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Features.Auth.DTOs;
 using Ate.Domain.Common;
+using Ate.Domain.Constants;
 using Ate.Domain.Entities;
 using Ate.Domain.Errors;
 using FluentValidation;
@@ -105,6 +106,92 @@ public class AuthService : IAuthService, IScopedDependency
         var userDto = new UserDto(
             user.Id,
             user.Email ?? string.Empty,
+            fullName,
+            user.Person?.AvatarUrl,
+            roles);
+
+        return Result.Success(new LoginResponse(accessToken, refreshTokenString, expiresAt, userDto));
+    }
+
+    public async Task<Result<LoginResponse>> GenerateDevTokenAsync(DevTokenRequest? request = null, CancellationToken cancellationToken = default)
+    {
+        var targetRole = string.IsNullOrWhiteSpace(request?.Role) ? RoleConstants.SuperAdmin : request.Role.Trim();
+        var roles = targetRole.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        if (roles.Count == 0)
+        {
+            roles.Add(RoleConstants.SuperAdmin);
+        }
+
+        var normalizedDocumentNumber = string.IsNullOrWhiteSpace(request?.DocumentNumber) ? "0000000000" : request.DocumentNumber.Trim();
+        var targetEmail = string.IsNullOrWhiteSpace(request?.Email) ? $"dev.{roles[0].ToLowerInvariant()}@ate.com" : request.Email.Trim();
+        var targetFullName = string.IsNullOrWhiteSpace(request?.FullName) ? $"Dev {roles[0]}" : request.FullName.Trim();
+
+        User? user = null;
+        try
+        {
+            user = await _context.Users
+                .AsNoTracking()
+                .Include(u => u.Person)
+                .Include(u => u.UserRoles)
+                    .ThenInclude(ur => ur.Role)
+                .FirstOrDefaultAsync(u => !u.IsDeleted && (u.Email == targetEmail || (u.Person != null && u.Person.DocumentNumber == normalizedDocumentNumber)), cancellationToken);
+        }
+        catch
+        {
+        }
+
+        if (user == null)
+        {
+            var nameParts = targetFullName.Split(' ', 2);
+            var firstName = nameParts[0];
+            var lastName = nameParts.Length > 1 ? nameParts[1] : "Developer";
+
+            user = new User
+            {
+                Id = Guid.CreateVersion7(),
+                Email = targetEmail,
+                IsActive = true,
+                EmailConfirmed = true,
+                MustChangePassword = false,
+                Person = new Person
+                {
+                    Id = Guid.CreateVersion7(),
+                    FirstName = firstName,
+                    LastName = lastName,
+                    DocumentNumber = normalizedDocumentNumber
+                }
+            };
+        }
+
+        var (accessToken, expiresAt) = _jwtTokenGenerator.GenerateToken(user, roles);
+        var refreshTokenString = _jwtTokenGenerator.GenerateRefreshToken();
+
+        try
+        {
+            var refreshToken = new RefreshToken
+            {
+                Id = Guid.CreateVersion7(),
+                UserId = user.Id,
+                Token = refreshTokenString,
+                ExpiresAt = _dateTimeProvider.UtcNow.AddDays(7),
+                CreatedAt = _dateTimeProvider.UtcNow,
+                IsRevoked = false
+            };
+
+            _context.RefreshTokens.Add(refreshToken);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+        }
+
+        var fullName = user.Person != null
+            ? $"{user.Person.FirstName} {user.Person.LastName}".Trim()
+            : targetFullName;
+
+        var userDto = new UserDto(
+            user.Id,
+            user.Email ?? targetEmail,
             fullName,
             user.Person?.AvatarUrl,
             roles);

@@ -1,6 +1,50 @@
 @Ate.Api_HostAddress = http://localhost:5252
 
-GET {{Ate.Api_HostAddress}}/weatherforecast/
+GET {{Ate.Api_HostAddress}}/api/health
 Accept: application/json
 
 ###
+
+GET {{Ate.Api_HostAddress}}/api/v1/auth/dev-token
+Accept: application/json
+
+###
+
+GET {{Ate.Api_HostAddress}}/api/v1/auth/dev-token?role=SuperAdmin
+Accept: application/json
+
+###
+
+GET {{Ate.Api_HostAddress}}/api/v1/auth/dev-token?role=CompanyAdmin
+Accept: application/json
+
+###
+
+GET {{Ate.Api_HostAddress}}/api/v1/auth/dev-token?role=Employee
+Accept: application/json
+
+###
+
+GET {{Ate.Api_HostAddress}}/api/v1/auth/dev-token?role=Merchant
+Accept: application/json
+
+###
+
+POST {{Ate.Api_HostAddress}}/api/v1/auth/dev-token
+Content-Type: application/json
+Accept: application/json
+
+{
+  "role": "SuperAdmin",
+  "email": "admin@ate.com",
+  "fullName": "SuperAdmin Ate",
+  "documentNumber": "0000000000"
+}
+
+###
+
+@token = paste_token_here
+
+GET {{Ate.Api_HostAddress}}/api/v1/auth/me
+Authorization: Bearer {{token}}
+Accept: application/json
