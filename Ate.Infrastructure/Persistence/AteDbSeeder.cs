@@ -1,4 +1,5 @@
 using Ate.Application.Common.Interfaces;
+using Ate.Domain.Constants;
 using Ate.Domain.Entities;
 using Ate.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -17,10 +18,10 @@ public static class AteDbSeeder
     {
         var roles = new[]
         {
-            new Role { Id = 1, Name = "SuperAdmin", Description = "Platform super administrator" },
-            new Role { Id = 2, Name = "CompanyAdmin", Description = "Company client administrator" },
-            new Role { Id = 3, Name = "Employee", Description = "Company employee" },
-            new Role { Id = 4, Name = "Merchant", Description = "Affiliated merchant" }
+            new Role { Id = 1, Name = RoleConstants.SuperAdmin, Description = "Platform super administrator" },
+            new Role { Id = 2, Name = RoleConstants.CompanyAdmin, Description = "Company client administrator" },
+            new Role { Id = 3, Name = RoleConstants.Employee, Description = "Company employee" },
+            new Role { Id = 4, Name = RoleConstants.Merchant, Description = "Affiliated merchant" }
         };
 
         foreach (var role in roles)
@@ -37,6 +38,8 @@ public static class AteDbSeeder
     private static async Task SeedDefaultAdminAsync(AteDbContext context, IPasswordHasher passwordHasher)
     {
         const string adminEmail = "admin@ate.com";
+        const string adminDocumentNumber = "0943676155";
+        const string legacyAdminDocumentNumber = "0000000000";
 
         var existingUser = await context.Users
             .IgnoreQueryFilters()
@@ -44,6 +47,16 @@ public static class AteDbSeeder
 
         if (existingUser != null)
         {
+            var legacyAdminPerson = await context.Persons
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(p => p.UserId == existingUser.Id && p.DocumentNumber == legacyAdminDocumentNumber);
+
+            if (legacyAdminPerson != null)
+            {
+                legacyAdminPerson.DocumentNumber = adminDocumentNumber;
+                await context.SaveChangesAsync();
+            }
+
             return;
         }
 
@@ -64,7 +77,7 @@ public static class AteDbSeeder
             FirstName = "SuperAdmin",
             LastName = "Ate",
             DocumentType = DocumentType.NationalId,
-            DocumentNumber = "0000000000"
+            DocumentNumber = adminDocumentNumber
         };
 
         var adminRole = new UserRole

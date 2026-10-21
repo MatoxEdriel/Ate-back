@@ -15,6 +15,9 @@ public static class ScalarExtensions
                        .WithTheme(ScalarTheme.Moon)
                        .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
             });
+
+            app.MapGet("/", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
+            app.MapGet("/scalar", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();
         }
 
         return app;

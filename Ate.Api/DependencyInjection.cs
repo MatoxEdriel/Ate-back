@@ -1,7 +1,9 @@
 using System.Text;
+using Ate.Api.Middlewares;
 using Ate.Api.Services;
 using Ate.Application.Common.Constants;
 using Ate.Application.Common.Interfaces;
+using Ate.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 
@@ -13,13 +15,12 @@ public static class DependencyInjection
     {
         services.AddOpenApi();
         services.AddHttpContextAccessor();
+        services.AddExceptionHandler<GlobalExceptionHandler>();
+        services.AddProblemDetails();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
 
-        var jwtSection = configuration.GetSection(ConfigurationConstants.JwtSettings.SectionName);
-        var secretKey = jwtSection[ConfigurationConstants.JwtSettings.SecretKey]
-            ?? throw new InvalidOperationException("JWT SecretKey is not configured.");
-        var issuer = jwtSection[ConfigurationConstants.JwtSettings.Issuer] ?? "Ate.Api";
-        var audience = jwtSection[ConfigurationConstants.JwtSettings.Audience] ?? "Ate.Client";
+        var jwtOptions = configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>()
+            ?? throw new InvalidOperationException("JwtSettings section is missing or invalid.");
 
         services.AddAuthentication(options =>
         {
@@ -36,9 +37,9 @@ public static class DependencyInjection
                 ValidateAudience = true,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
-                ValidIssuer = issuer,
-                ValidAudience = audience,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey)),
+                ValidIssuer = jwtOptions.Issuer,
+                ValidAudience = jwtOptions.Audience,
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecretKey)),
                 ClockSkew = TimeSpan.Zero
             };
         });
