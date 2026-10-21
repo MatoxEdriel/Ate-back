@@ -19,7 +19,7 @@ SELECT setval(pg_get_serial_sequence('roles', 'id'), COALESCE(MAX(id), 1)) FROM 
 -- 2. DEFAULT SUPERADMIN USER
 -- Default Credentials:
 --   Identifier / Email: admin@ate.com
---   Identifier / Document: 0000000000
+--   Identifier / Document: 0943676155
 --   Password: Admin123*Ate (PBKDF2 SHA-256 with 100,000 iterations)
 INSERT INTO users (
     id,
@@ -60,7 +60,7 @@ VALUES (
     'SuperAdmin',
     'Ate',
     'NationalId',
-    '0000000000',
+    '0943676155',
     CURRENT_TIMESTAMP,
     FALSE
 )

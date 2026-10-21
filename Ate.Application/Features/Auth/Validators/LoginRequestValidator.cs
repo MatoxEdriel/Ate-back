@@ -9,10 +9,10 @@ public class LoginRequestValidator : AbstractValidator<LoginRequest>
     {
         RuleFor(x => x.DocumentNumber)
             .NotEmpty()
-            .WithMessage("Document number (cédula) is required.");
+            .WithMessage("Ingresa tu cédula o pasaporte.");
 
         RuleFor(x => x.Password)
             .NotEmpty()
-            .WithMessage("Password is required.");
+            .WithMessage("Ingresa tu contraseña.");
     }
 }

@@ -37,7 +37,7 @@ public class AuthService : IAuthService, IScopedDependency
         if (!validationResult.IsValid)
         {
             var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
-            return Result.Failure<LoginResponse>(Error.Validation("Auth.MissingCredentials", "Validation failed for login payload.", errors));
+            return Result.Failure<LoginResponse>(Error.Validation("Auth.MissingCredentials", "Revisa los datos ingresados.", errors));
         }
 
         var normalizedDocumentNumber = request.DocumentNumber.Trim();
@@ -122,7 +122,7 @@ public class AuthService : IAuthService, IScopedDependency
             roles.Add(RoleConstants.SuperAdmin);
         }
 
-        var normalizedDocumentNumber = string.IsNullOrWhiteSpace(request?.DocumentNumber) ? "0000000000" : request.DocumentNumber.Trim();
+        var normalizedDocumentNumber = string.IsNullOrWhiteSpace(request?.DocumentNumber) ? "0943676155" : request.DocumentNumber.Trim();
         var targetEmail = string.IsNullOrWhiteSpace(request?.Email) ? $"dev.{roles[0].ToLowerInvariant()}@ate.com" : request.Email.Trim();
         var targetFullName = string.IsNullOrWhiteSpace(request?.FullName) ? $"Dev {roles[0]}" : request.FullName.Trim();
 

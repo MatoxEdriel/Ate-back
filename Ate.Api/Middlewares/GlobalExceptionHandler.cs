@@ -26,7 +26,7 @@ public class GlobalExceptionHandler : IExceptionHandler
 
         var errorMessage = _environment.IsDevelopment()
             ? exception.Message
-            : "An unexpected server error occurred. Please try again later.";
+            : "Ocurrió un error inesperado. Intenta de nuevo más tarde.";
 
         var errors = _environment.IsDevelopment() && exception.StackTrace != null
             ? new[] { exception.GetType().Name }

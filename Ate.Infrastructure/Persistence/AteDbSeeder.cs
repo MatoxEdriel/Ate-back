@@ -38,6 +38,8 @@ public static class AteDbSeeder
     private static async Task SeedDefaultAdminAsync(AteDbContext context, IPasswordHasher passwordHasher)
     {
         const string adminEmail = "admin@ate.com";
+        const string adminDocumentNumber = "0943676155";
+        const string legacyAdminDocumentNumber = "0000000000";
 
         var existingUser = await context.Users
             .IgnoreQueryFilters()
@@ -45,6 +47,16 @@ public static class AteDbSeeder
 
         if (existingUser != null)
         {
+            var legacyAdminPerson = await context.Persons
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(p => p.UserId == existingUser.Id && p.DocumentNumber == legacyAdminDocumentNumber);
+
+            if (legacyAdminPerson != null)
+            {
+                legacyAdminPerson.DocumentNumber = adminDocumentNumber;
+                await context.SaveChangesAsync();
+            }
+
             return;
         }
 
@@ -65,7 +77,7 @@ public static class AteDbSeeder
             FirstName = "SuperAdmin",
             LastName = "Ate",
             DocumentType = DocumentType.NationalId,
-            DocumentNumber = "0000000000"
+            DocumentNumber = adminDocumentNumber
         };
 
         var adminRole = new UserRole

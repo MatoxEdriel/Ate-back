@@ -845,7 +845,7 @@ Se implementó el patrón de **3 capas de identidad**:
    * Todas las entidades de negocio implementan `IAuditableEntity` con 7 columnas: `created_at`, `created_by`, `updated_at`, `updated_by`, `is_deleted`, `deleted_at`, `deleted_by`.
    * El `AteDbContext` gestiona automáticamente los timestamps y el borrado lógico (Soft Delete).
 5. **Seeder Inicial:**
-   * En `AteDbSeeder.cs`, se siembran los 4 roles base y la cuenta SuperAdmin inicial (`admin@ate.com` / `Admin123*Ate`) vinculada a su respectiva persona con documento `0000000000`.
+   * En `AteDbSeeder.cs`, se siembran los 4 roles base y la cuenta SuperAdmin inicial (`admin@ate.com` / `Admin123*Ate`) vinculada a su respectiva persona con documento `0943676155`.
 
 ### 11.3 Manejo Estándar de Errores: Result Pattern & Global Exception Handler
 

@@ -13,7 +13,7 @@ This directory will contain the SQL scripts for the Ate database.
   * Catalog roles (`SuperAdmin`, `CompanyAdmin`, `Employee`, `Merchant`).
   * Default SuperAdmin user:
     * **Email:** `admin@ate.com`
-    * **Document:** `0000000000`
+    * **Document:** `0943676155`
     * **Password:** `Admin123*Ate` (PBKDF2 SHA-256)
   * SuperAdmin person profile and role assignment.
 
