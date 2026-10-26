@@ -18,6 +18,11 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(e => e.Department)
             .HasMaxLength(100);
 
+        builder.Property(e => e.MonthlyAllowance)
+            .HasPrecision(12, 2)
+            .IsRequired()
+            .HasDefaultValue(0m);
+
         builder.Property(e => e.QrCodeToken)
             .HasMaxLength(255)
             .IsRequired();

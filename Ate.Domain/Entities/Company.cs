@@ -10,7 +10,9 @@ public class Company : BaseAuditableEntity
     public string? Email { get; set; }
     public string? Phone { get; set; }
     public string? Address { get; set; }
+    public string? LogoUrl { get; set; }
     public bool IsActive { get; set; } = true;
 
     public ICollection<Employee> Employees { get; set; } = new List<Employee>();
+    public ICollection<User> Users { get; set; } = new List<User>();
 }

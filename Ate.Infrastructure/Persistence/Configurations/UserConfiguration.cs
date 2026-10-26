@@ -34,6 +34,14 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.HasOne(u => u.Company)
+            .WithMany(c => c.Users)
+            .HasForeignKey(u => u.CompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasIndex(u => u.CompanyId)
+            .HasFilter("company_id IS NOT NULL AND is_deleted = false");
+
         builder.HasQueryFilter(u => !u.IsDeleted);
     }
 }
