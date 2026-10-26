@@ -37,6 +37,9 @@ public class CompanyConfiguration : IEntityTypeConfiguration<Company>
         builder.Property(c => c.Address)
             .HasMaxLength(300);
 
+        builder.Property(c => c.LogoUrl)
+            .HasMaxLength(500);
+
         builder.Property(c => c.IsActive)
             .IsRequired()
             .HasDefaultValue(true);

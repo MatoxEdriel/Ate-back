@@ -1,7 +1,7 @@
 -- =============================================================================
 -- Ate Platform - Initial Schema DDL (PostgreSQL 16)
 -- Clean Architecture Identity & Onboarding Core
--- Tables: roles, users, persons, user_roles, companies, employees,
+-- Tables: roles, users, persons, user_roles, companies (users.company_id), employees,
 --         refresh_tokens, user_external_logins
 -- =============================================================================
 
@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS companies (
     email VARCHAR(100) NULL,
     phone VARCHAR(30) NULL,
     address VARCHAR(300) NULL,
+    logo_url VARCHAR(500) NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
@@ -92,9 +93,28 @@ CREATE TABLE IF NOT EXISTS companies (
     deleted_by UUID NULL
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS ix_companies_tax_id 
-ON companies(tax_id) 
+CREATE UNIQUE INDEX IF NOT EXISTS ix_companies_tax_id
+ON companies(tax_id)
 WHERE is_deleted = FALSE;
+
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS logo_url VARCHAR(500) NULL;
+
+-- 5.1 USERS -> COMPANIES (Company administrators belong to one company)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id UUID NULL;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'fk_users_companies'
+    ) THEN
+        ALTER TABLE users
+        ADD CONSTRAINT fk_users_companies FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS ix_users_company_id
+ON users(company_id)
+WHERE company_id IS NOT NULL AND is_deleted = FALSE;
 
 -- 6. EMPLOYEES
 CREATE TABLE IF NOT EXISTS employees (
@@ -103,6 +123,7 @@ CREATE TABLE IF NOT EXISTS employees (
     person_id UUID NOT NULL,
     employee_code VARCHAR(50) NULL,
     department VARCHAR(100) NULL,
+    monthly_allowance NUMERIC(12,2) NOT NULL DEFAULT 0,
     qr_code_token VARCHAR(255) NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -120,8 +141,24 @@ CREATE UNIQUE INDEX IF NOT EXISTS ix_employees_qr_code_token
 ON employees(qr_code_token) 
 WHERE is_deleted = FALSE;
 
-CREATE UNIQUE INDEX IF NOT EXISTS ix_employees_company_person 
-ON employees(company_id, person_id) 
+CREATE UNIQUE INDEX IF NOT EXISTS ix_employees_company_person
+ON employees(company_id, person_id)
+WHERE is_deleted = FALSE;
+
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS monthly_allowance NUMERIC(12,2) NOT NULL DEFAULT 0;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'ck_employees_monthly_allowance'
+    ) THEN
+        ALTER TABLE employees
+        ADD CONSTRAINT ck_employees_monthly_allowance CHECK (monthly_allowance >= 0);
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS ix_employees_company_id
+ON employees(company_id)
 WHERE is_deleted = FALSE;
 
 -- 7. REFRESH_TOKENS

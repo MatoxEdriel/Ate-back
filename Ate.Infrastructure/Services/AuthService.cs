@@ -45,6 +45,7 @@ public class AuthService : IAuthService, IScopedDependency
         var user = await _context.Users
             .AsNoTracking()
             .Include(u => u.Person)
+            .Include(u => u.Company)
             .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
             .FirstOrDefaultAsync(u => !u.IsDeleted && u.Person != null && u.Person.DocumentNumber == normalizedDocumentNumber, cancellationToken);
@@ -108,7 +109,8 @@ public class AuthService : IAuthService, IScopedDependency
             user.Email ?? string.Empty,
             fullName,
             user.Person?.AvatarUrl,
-            roles);
+            roles,
+            ToCompanyDto(user.Company));
 
         return Result.Success(new LoginResponse(accessToken, refreshTokenString, expiresAt, userDto));
     }
@@ -132,6 +134,7 @@ public class AuthService : IAuthService, IScopedDependency
             user = await _context.Users
                 .AsNoTracking()
                 .Include(u => u.Person)
+                .Include(u => u.Company)
                 .Include(u => u.UserRoles)
                     .ThenInclude(ur => ur.Role)
                 .FirstOrDefaultAsync(u => !u.IsDeleted && (u.Email == targetEmail || (u.Person != null && u.Person.DocumentNumber == normalizedDocumentNumber)), cancellationToken);
@@ -194,8 +197,16 @@ public class AuthService : IAuthService, IScopedDependency
             user.Email ?? targetEmail,
             fullName,
             user.Person?.AvatarUrl,
-            roles);
+            roles,
+            ToCompanyDto(user.Company));
 
         return Result.Success(new LoginResponse(accessToken, refreshTokenString, expiresAt, userDto));
+    }
+
+    private static CompanyDto? ToCompanyDto(Company? company)
+    {
+        return company == null
+            ? null
+            : new CompanyDto(company.Id, company.BusinessName, company.LogoUrl);
     }
 }

@@ -8,12 +8,68 @@ namespace Ate.Infrastructure.Persistence;
 
 public static class AteDbSeeder
 {
+    private static readonly (string FirstName, string LastName, string DocumentNumber, string Email, string Code, string Department, decimal Allowance, bool IsActive)[] SampleEmployees =
+    [
+        ("María Belén", "Cevallos Ruiz", "0923456781", "maria.cevallos@acme.com", "EMP-002", "Talento Humano", 150m, true),
+        ("José Andrés", "Paredes Vera", "0934567812", "jose.paredes@acme.com", "EMP-003", "Tecnología", 120m, true),
+        ("Ana Lucía", "Torres Mendoza", "0945678123", "ana.torres@acme.com", "EMP-004", "Finanzas", 180m, true),
+        ("Luis Fernando", "Zambrano Ortiz", "0956781234", "luis.zambrano@acme.com", "EMP-005", "Operaciones", 100m, true),
+        ("Gabriela", "Salazar Moreira", "0967812345", "gabriela.salazar@acme.com", "EMP-006", "Ventas", 130m, true),
+        ("Diego Alejandro", "Herrera Castro", "0978123456", "diego.herrera@acme.com", "EMP-007", "Tecnología", 160m, true),
+        ("Valeria", "Montalvo Quiñónez", "0989234567", "valeria.montalvo@acme.com", "EMP-008", "Administración", 110m, false),
+        ("Carlos Eduardo", "Villacís Romero", "0991345678", "carlos.villacis@acme.com", "EMP-009", "Operaciones", 100m, true),
+        ("Daniela", "Aguirre Pazmiño", "0902456789", "daniela.aguirre@acme.com", "EMP-010", "Ventas", 140m, true),
+        ("Miguel Ángel", "Rivadeneira León", "0913567890", "miguel.rivadeneira@acme.com", "EMP-011", "Finanzas", 200m, true),
+        ("Sofía", "Benítez Andrade", "0924678901", "sofia.benitez@acme.com", "EMP-012", "Talento Humano", 120m, false),
+        ("Andrés Sebastián", "Jaramillo Cruz", "0935789012", "andres.jaramillo@acme.com", "EMP-013", "Tecnología", 175m, true),
+        ("Paola Estefanía", "Navarrete Solís", "0946890123", "paola.navarrete@acme.com", "EMP-014", "Administración", 115m, true),
+        ("Ricardo", "Espinoza Guerrero", "0957901234", "ricardo.espinoza@acme.com", "EMP-015", "Operaciones", 105m, true)
+    ];
+
     public static async Task SeedAsync(AteDbContext context, IPasswordHasher passwordHasher)
     {
         await SeedRolesAsync(context);
-        await SeedCompanyAdminAsync(context, passwordHasher);
+        var company = await SeedDefaultCompanyAsync(context);
+        await SeedCompanyAdminAsync(context, passwordHasher, company);
         await SeedSuperAdminAsync(context, passwordHasher);
-        await SeedDefaultEmployeeAsync(context, passwordHasher);
+        await SeedDefaultEmployeeAsync(context, passwordHasher, company);
+        await SeedSampleEmployeesAsync(context, passwordHasher, company);
+    }
+
+    private static async Task<Company> SeedDefaultCompanyAsync(AteDbContext context)
+    {
+        const string companyTaxId = "0990000001001";
+        const string companyLogoUrl = "/assets/companies/acme-logo.svg";
+
+        var company = await context.Companies.FirstOrDefaultAsync(c => c.TaxId == companyTaxId);
+        if (company != null)
+        {
+            if (string.IsNullOrWhiteSpace(company.LogoUrl))
+            {
+                company.LogoUrl = companyLogoUrl;
+                await context.SaveChangesAsync();
+            }
+
+            return company;
+        }
+
+        company = new Company
+        {
+            Id = Guid.CreateVersion7(),
+            BusinessName = "Acme Corporation S.A.",
+            TradeName = "Acme Corp",
+            TaxId = companyTaxId,
+            Email = "contacto@acme.com",
+            Phone = "042000000",
+            Address = "Av. Principal 123 y Calle B",
+            LogoUrl = companyLogoUrl,
+            IsActive = true
+        };
+
+        context.Companies.Add(company);
+        await context.SaveChangesAsync();
+
+        return company;
     }
 
     private static async Task SeedRolesAsync(AteDbContext context)
@@ -37,7 +93,7 @@ public static class AteDbSeeder
         await context.SaveChangesAsync();
     }
 
-    private static async Task SeedCompanyAdminAsync(AteDbContext context, IPasswordHasher passwordHasher)
+    private static async Task SeedCompanyAdminAsync(AteDbContext context, IPasswordHasher passwordHasher, Company company)
     {
         const string adminEmail = "admin@ate.com";
         const string adminDocumentNumber = "0943676155";
@@ -48,6 +104,8 @@ public static class AteDbSeeder
 
         if (existingUser != null)
         {
+            existingUser.CompanyId ??= company.Id;
+
             var person = await context.Persons
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(p => p.UserId == existingUser.Id);
@@ -79,7 +137,8 @@ public static class AteDbSeeder
             PasswordHash = passwordHasher.HashPassword("Admin123*Ate"),
             IsActive = true,
             EmailConfirmed = true,
-            MustChangePassword = false
+            MustChangePassword = false,
+            CompanyId = company.Id
         };
 
         var adminPerson = new Person
@@ -154,7 +213,7 @@ public static class AteDbSeeder
         await context.SaveChangesAsync();
     }
 
-    private static async Task SeedDefaultEmployeeAsync(AteDbContext context, IPasswordHasher passwordHasher)
+    private static async Task SeedDefaultEmployeeAsync(AteDbContext context, IPasswordHasher passwordHasher, Company company)
     {
         const string employeeEmail = "empleado@ate.com";
         const string employeeDocumentNumber = "0912345678";
@@ -166,24 +225,6 @@ public static class AteDbSeeder
         if (existingUser != null)
         {
             return;
-        }
-
-        var company = await context.Companies.FirstOrDefaultAsync(c => c.TaxId == "0990000001001");
-        if (company == null)
-        {
-            company = new Company
-            {
-                Id = Guid.CreateVersion7(),
-                BusinessName = "Acme Corporation S.A.",
-                TradeName = "Acme Corp",
-                TaxId = "0990000001001",
-                Email = "contacto@acme.com",
-                Phone = "042000000",
-                Address = "Av. Principal 123 y Calle B",
-                IsActive = true
-            };
-            context.Companies.Add(company);
-            await context.SaveChangesAsync();
         }
 
         var user = new User
@@ -220,6 +261,7 @@ public static class AteDbSeeder
             PersonId = person.Id,
             EmployeeCode = "EMP-001",
             Department = "Tecnología",
+            MonthlyAllowance = 120m,
             IsActive = true
         };
 
@@ -227,6 +269,65 @@ public static class AteDbSeeder
         context.Persons.Add(person);
         context.UserRoles.Add(role);
         context.Employees.Add(employee);
+
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task SeedSampleEmployeesAsync(AteDbContext context, IPasswordHasher passwordHasher, Company company)
+    {
+        var documentNumbers = SampleEmployees.Select(s => s.DocumentNumber).ToList();
+        var existingDocuments = await context.Persons
+            .IgnoreQueryFilters()
+            .Where(p => documentNumbers.Contains(p.DocumentNumber))
+            .Select(p => p.DocumentNumber)
+            .ToListAsync();
+
+        var pending = SampleEmployees.Where(s => !existingDocuments.Contains(s.DocumentNumber)).ToList();
+        if (pending.Count == 0)
+        {
+            return;
+        }
+
+        var passwordHash = passwordHasher.HashPassword("Admin123*Ate");
+
+        foreach (var sample in pending)
+        {
+            var user = new User
+            {
+                Email = sample.Email,
+                PasswordHash = passwordHash,
+                IsActive = true,
+                EmailConfirmed = true,
+                MustChangePassword = false
+            };
+
+            var person = new Person
+            {
+                UserId = user.Id,
+                FirstName = sample.FirstName,
+                LastName = sample.LastName,
+                DocumentType = DocumentType.NationalId,
+                DocumentNumber = sample.DocumentNumber
+            };
+
+            context.Users.Add(user);
+            context.Persons.Add(person);
+            context.UserRoles.Add(new UserRole
+            {
+                UserId = user.Id,
+                RoleId = 3,
+                AssignedAt = DateTimeOffset.UtcNow
+            });
+            context.Employees.Add(new Employee
+            {
+                CompanyId = company.Id,
+                PersonId = person.Id,
+                EmployeeCode = sample.Code,
+                Department = sample.Department,
+                MonthlyAllowance = sample.Allowance,
+                IsActive = sample.IsActive
+            });
+        }
 
         await context.SaveChangesAsync();
     }
