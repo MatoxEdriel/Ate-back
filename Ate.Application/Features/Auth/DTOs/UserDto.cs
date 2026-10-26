@@ -5,4 +5,5 @@ public record UserDto(
     string Email,
     string FullName,
     string? AvatarUrl,
-    IReadOnlyList<string> Roles);
+    IReadOnlyList<string> Roles,
+    CompanyDto? Company);
