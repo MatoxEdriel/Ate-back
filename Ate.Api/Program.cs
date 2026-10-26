@@ -36,7 +36,7 @@ app.UseScalarDocumentation();
 
 app.MapControllers();
 
-app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy", timestamp = DateTimeOffset.UtcNow }))
+app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy", version = "1.0.1", timestamp = DateTimeOffset.UtcNow }))
    .WithName("HealthCheck")
    .WithTags("System Health")
    .WithSummary("System health check")

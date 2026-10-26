@@ -5,6 +5,14 @@ public static class ConfigurationConstants
     public static class ConnectionStrings
     {
         public const string DefaultConnection = "DefaultConnection";
+        public const string MongoDbConnection = "MongoDbConnection";
+    }
+
+    public static class MongoDbSettings
+    {
+        public const string SectionName = "MongoDbSettings";
+        public const string ConnectionString = "ConnectionString";
+        public const string DatabaseName = "DatabaseName";
     }
 
     public static class JwtSettings

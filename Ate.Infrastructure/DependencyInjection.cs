@@ -1,5 +1,6 @@
 using Ate.Application.Common.Constants;
 using Ate.Application.Common.Interfaces;
+using Ate.Infrastructure.Extensions;
 using Ate.Infrastructure.Persistence;
 using Ate.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
@@ -50,6 +51,8 @@ public static class DependencyInjection
                 type.Name.EndsWith("Repository")))
                 .AsMatchingInterface()
                 .WithScopedLifetime());
+
+        services.AddMongoDb(configuration);
 
         return services;
     }
