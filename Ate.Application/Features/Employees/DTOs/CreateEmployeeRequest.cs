@@ -7,4 +7,4 @@ public record CreateEmployeeRequest(
     string Email,
     string EmployeeCode,
     string Department,
-    decimal MonthlyAllowance);
+    bool IsIntern = false);

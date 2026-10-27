@@ -16,6 +16,19 @@ services:
       - ./database/02_seed_data.sql:/docker-entrypoint-initdb.d/02_seed_data.sql
       - postgres_ate_data:/var/lib/postgresql/data
 
+  mongo:
+    image: mongo:8.0
+    container_name: ate_mongo_db
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ate_admin
+      MONGO_INITDB_ROOT_PASSWORD: ate_mongo_2026
+      MONGO_INITDB_DATABASE: ate_nosql_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_ate_data:/data/db
+
   api:
     build:
       context: .
@@ -27,8 +40,11 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=ate_db;Username=postgres;Password=postgres
+      - ConnectionStrings__MongoDbConnection=mongodb://ate_admin:ate_mongo_2026@mongo:27017/?authSource=admin
     depends_on:
       - postgres
+      - mongo
 
 volumes:
   postgres_ate_data:
+  mongo_ate_data:

@@ -2,6 +2,7 @@ using Ate.Application.Common.Constants;
 using Ate.Application.Common.Interfaces;
 using Ate.Infrastructure.Extensions;
 using Ate.Infrastructure.Persistence;
+using Ate.Infrastructure.Persistence.Interceptors;
 using Ate.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -27,10 +28,13 @@ public static class DependencyInjection
         var dataSource = NpgsqlDataSource.Create(connectionString);
         services.AddSingleton(dataSource);
 
-        services.AddDbContext<AteDbContext>(options =>
+        services.AddScoped<DishCatalogSyncInterceptor>();
+
+        services.AddDbContext<AteDbContext>((sp, options) =>
         {
             options.UseNpgsql(dataSource)
-                   .UseSnakeCaseNamingConvention();
+                   .UseSnakeCaseNamingConvention()
+                   .AddInterceptors(sp.GetRequiredService<DishCatalogSyncInterceptor>());
         });
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<AteDbContext>());

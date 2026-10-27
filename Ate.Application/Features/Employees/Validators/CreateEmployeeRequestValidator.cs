@@ -48,11 +48,5 @@ public class CreateEmployeeRequestValidator : AbstractValidator<CreateEmployeeRe
             .WithMessage("Selecciona el departamento.")
             .MaximumLength(100)
             .WithMessage("El departamento no puede superar 100 caracteres.");
-
-        RuleFor(x => x.MonthlyAllowance)
-            .GreaterThanOrEqualTo(10)
-            .WithMessage("El cupo mínimo es $10.00.")
-            .LessThanOrEqualTo(9999999999.99m)
-            .WithMessage("El cupo supera el máximo permitido.");
     }
 }

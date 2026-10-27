@@ -13,6 +13,9 @@ public interface IApplicationDbContext
     DbSet<Employee> Employees { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<UserExternalLogin> UserExternalLogins { get; }
+    DbSet<Restaurant> Restaurants { get; }
+    DbSet<RestaurantDish> RestaurantDishes { get; }
+    DbSet<CompanyRestaurantAgreement> CompanyRestaurantAgreements { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
