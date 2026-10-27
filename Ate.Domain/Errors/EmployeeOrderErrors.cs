@@ -17,7 +17,10 @@ public static class EmployeeOrderErrors
         Error.Validation("EmployeeOrder.OrderingClosed", "Ya pasó la hora de corte para pedir en este restaurante.");
 
     public static readonly Error AlreadyOrdered =
-        Error.Conflict("EmployeeOrder.AlreadyOrdered", "Ya tienes un pedido registrado para esta comida. Cancélalo si quieres cambiarlo.");
+        Error.Conflict("EmployeeOrder.AlreadyOrdered", "Ya tienes un pedido en curso para esta comida. Espera a que te lo entreguen o cancélalo si quieres cambiarlo.");
+
+    public static readonly Error DeliveryAddressMissing =
+        Error.Validation("EmployeeOrder.DeliveryAddressMissing", "Tu empresa no tiene una dirección registrada para entregas. Elige comer en el local o retirarlo para llevar.");
 
     public static readonly Error NotFound =
         Error.NotFound("EmployeeOrder.NotFound", "No encontramos este pedido.");

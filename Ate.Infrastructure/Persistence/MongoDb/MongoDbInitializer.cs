@@ -46,6 +46,14 @@ public static class MongoDbInitializer
                 })
         ], cancellationToken);
 
+        // Closed orders must not hold the "one active order per meal" slot (older data kept it on Delivered).
+        await orders.UpdateManyAsync(
+            Builders<EmployeeOrder>.Filter.And(
+                Builders<EmployeeOrder>.Filter.Exists(o => o.ActiveSlot),
+                Builders<EmployeeOrder>.Filter.In(o => o.Status, [EmployeeOrderStatus.Delivered, EmployeeOrderStatus.Cancelled])),
+            Builders<EmployeeOrder>.Update.Unset(o => o.ActiveSlot),
+            cancellationToken: cancellationToken);
+
         if (!existing.Contains(MongoCollections.DishCatalog))
         {
             await database.CreateCollectionAsync(MongoCollections.DishCatalog, cancellationToken: cancellationToken);

@@ -22,8 +22,12 @@ public class CreateEmployeeOrderRequestValidator : AbstractValidator<CreateEmplo
 
         RuleFor(x => x.Drink)
             .Must(drink => string.IsNullOrWhiteSpace(drink)
-                || drink.Trim().ToLowerInvariant() is EmployeeOrderDrinks.Default or EmployeeOrderDrinks.Water)
-            .WithMessage("La bebida debe ser la del plato o agua.");
+                || drink.Trim().ToLowerInvariant() is EmployeeOrderDrinks.Juice or EmployeeOrderDrinks.Water or EmployeeOrderDrinks.Default)
+            .WithMessage("La bebida debe ser jugo o agua.");
+
+        RuleFor(x => x.DeliveryMode)
+            .Must(mode => EmployeeOrderDeliveryModes.Normalize(mode) != null)
+            .WithMessage("Elige si comes en el local, lo retiras para llevar o te lo llevan a tu trabajo.");
 
         RuleFor(x => x.Notes)
             .MaximumLength(250)

@@ -25,8 +25,8 @@ public class EmployeeOrder
     /// <summary>Día de servicio en hora de negocio (America/Guayaquil), formato yyyy-MM-dd.</summary>
     public string ServiceDate { get; set; } = string.Empty;
     /// <summary>
-    /// "{employeeId}:{serviceDate}:{mealType}" mientras el pedido está activo; se elimina al cancelar.
-    /// Tiene índice único: impide dos pedidos activos para la misma comida del mismo día.
+    /// "{employeeId}:{serviceDate}:{mealType}" mientras el pedido está activo; se elimina al entregar o cancelar.
+    /// Tiene índice único: impide dos pedidos activos a la vez para la misma comida del mismo día.
     /// </summary>
     public string? ActiveSlot { get; set; }
 
@@ -37,6 +37,11 @@ public class EmployeeOrder
     public string Status { get; set; } = EmployeeOrderStatus.Pending;
     public List<EmployeeOrderStatusChange> StatusHistory { get; set; } = new();
     public string? Notes { get; set; }
+
+    /// <summary>"local" (come ahí), "retiro" (para llevar) o "entrega" (en el trabajo). Pedidos anteriores sin campo = retiro.</summary>
+    public string DeliveryMode { get; set; } = "retiro";
+    /// <summary>Copia de la dirección de la empresa al momento del pedido; solo para "entrega".</summary>
+    public string? DeliveryAddress { get; set; }
 
     public DateTimeOffset OrderedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;

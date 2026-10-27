@@ -17,6 +17,8 @@ public record EmployeeOrderDto(
     string Status,
     IReadOnlyList<EmployeeOrderStatusChangeDto> StatusHistory,
     string? Notes,
+    string DeliveryMode,
+    string? DeliveryAddress,
     DateTimeOffset OrderedAt,
     DateTimeOffset? UpdatedAt);
 
