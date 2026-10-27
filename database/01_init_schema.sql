@@ -2,7 +2,8 @@
 -- Ate Platform - Initial Schema DDL (PostgreSQL 16)
 -- Clean Architecture Identity & Onboarding Core
 -- Tables: roles, users, persons, user_roles, companies (users.company_id), employees,
---         refresh_tokens, user_external_logins
+--         refresh_tokens, user_external_logins, restaurants, restaurant_dishes,
+--         company_restaurant_agreements
 -- =============================================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -124,6 +125,7 @@ CREATE TABLE IF NOT EXISTS employees (
     employee_code VARCHAR(50) NULL,
     department VARCHAR(100) NULL,
     monthly_allowance NUMERIC(12,2) NOT NULL DEFAULT 0,
+    is_intern BOOLEAN NOT NULL DEFAULT FALSE,
     qr_code_token VARCHAR(255) NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -146,6 +148,7 @@ ON employees(company_id, person_id)
 WHERE is_deleted = FALSE;
 
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS monthly_allowance NUMERIC(12,2) NOT NULL DEFAULT 0;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_intern BOOLEAN NOT NULL DEFAULT FALSE;
 
 DO $$
 BEGIN
@@ -184,3 +187,94 @@ CREATE TABLE IF NOT EXISTS user_external_logins (
     CONSTRAINT fk_user_external_logins_users FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT uq_external_logins_provider_key UNIQUE (provider, provider_key)
 );
+
+-- 9. RESTAURANTS (Affiliated restaurants / merchants)
+CREATE TABLE IF NOT EXISTS restaurants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    merchant_user_id UUID NULL,
+    code VARCHAR(50) NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    cuisine VARCHAR(80) NOT NULL,
+    address VARCHAR(300) NULL,
+    phone VARCHAR(30) NULL,
+    brand_color VARCHAR(7) NOT NULL,
+    logo_url VARCHAR(500) NULL,
+    icon VARCHAR(30) NULL,
+    ready_minutes INT NOT NULL DEFAULT 15,
+    breakfast_cutoff TIME NULL,
+    lunch_cutoff TIME NULL,
+    dinner_cutoff TIME NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
+    updated_at TIMESTAMPTZ NULL,
+    updated_by UUID NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ NULL,
+    deleted_by UUID NULL,
+    CONSTRAINT fk_restaurants_users FOREIGN KEY (merchant_user_id) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT ck_restaurants_ready_minutes CHECK (ready_minutes >= 0)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ix_restaurants_code
+ON restaurants(code)
+WHERE is_deleted = FALSE;
+
+CREATE INDEX IF NOT EXISTS ix_restaurants_merchant_user_id
+ON restaurants(merchant_user_id)
+WHERE merchant_user_id IS NOT NULL AND is_deleted = FALSE;
+
+-- 10. RESTAURANT_DISHES (Menu per meal type: breakfast, lunch, dinner)
+CREATE TABLE IF NOT EXISTS restaurant_dishes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    restaurant_id UUID NOT NULL,
+    meal_type VARCHAR(20) NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    description VARCHAR(300) NOT NULL DEFAULT '',
+    protein VARCHAR(30) NOT NULL DEFAULT '',
+    has_rice BOOLEAN NOT NULL DEFAULT FALSE,
+    default_drink VARCHAR(50) NOT NULL DEFAULT 'Jugo',
+    price NUMERIC(10,2) NOT NULL DEFAULT 0,
+    is_available BOOLEAN NOT NULL DEFAULT TRUE,
+    sort_order INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
+    updated_at TIMESTAMPTZ NULL,
+    updated_by UUID NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ NULL,
+    deleted_by UUID NULL,
+    CONSTRAINT fk_restaurant_dishes_restaurants FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_restaurant_dishes_meal_type CHECK (meal_type IN ('breakfast', 'lunch', 'dinner')),
+    CONSTRAINT ck_restaurant_dishes_price CHECK (price >= 0)
+);
+
+CREATE INDEX IF NOT EXISTS ix_restaurant_dishes_restaurant_meal
+ON restaurant_dishes(restaurant_id, meal_type)
+WHERE is_deleted = FALSE;
+
+-- 11. COMPANY_RESTAURANT_AGREEMENTS (Which restaurants each client company offers)
+CREATE TABLE IF NOT EXISTS company_restaurant_agreements (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID NOT NULL,
+    restaurant_id UUID NOT NULL,
+    distance_m INT NOT NULL DEFAULT 0,
+    starts_on DATE NOT NULL DEFAULT CURRENT_DATE,
+    ends_on DATE NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
+    updated_at TIMESTAMPTZ NULL,
+    updated_by UUID NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ NULL,
+    deleted_by UUID NULL,
+    CONSTRAINT fk_agreements_companies FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_agreements_restaurants FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE RESTRICT,
+    CONSTRAINT ck_agreements_distance CHECK (distance_m >= 0),
+    CONSTRAINT ck_agreements_dates CHECK (ends_on IS NULL OR ends_on >= starts_on)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ix_agreements_company_restaurant
+ON company_restaurant_agreements(company_id, restaurant_id)
+WHERE is_deleted = FALSE;

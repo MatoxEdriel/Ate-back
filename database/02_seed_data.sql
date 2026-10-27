@@ -127,11 +127,15 @@ VALUES (
     'SuperAdmin',
     'Ate',
     'NationalId',
-    '0999999999',
+    '0943676157',
     CURRENT_TIMESTAMP,
     FALSE
 )
 ON CONFLICT (document_type, document_number) DO NOTHING;
+
+UPDATE persons
+SET document_number = '0943676157'
+WHERE user_id = '01928000-0000-7000-8000-000000000010';
 
 INSERT INTO user_roles (
     user_id,
@@ -225,11 +229,15 @@ VALUES (
     'Carlos',
     'Mendoza',
     'NationalId',
-    '0912345678',
+    '0943676156',
     CURRENT_TIMESTAMP,
     FALSE
 )
 ON CONFLICT (document_type, document_number) DO NOTHING;
+
+UPDATE persons
+SET document_number = '0943676156'
+WHERE user_id = '01928000-0000-7000-8000-000000000030';
 
 INSERT INTO user_roles (
     user_id,
@@ -250,6 +258,7 @@ INSERT INTO employees (
     employee_code,
     department,
     monthly_allowance,
+    is_intern,
     qr_code_token,
     is_active,
     created_at,
@@ -262,6 +271,7 @@ VALUES (
     'EMP-001',
     'Tecnología',
     120.00,
+    FALSE,
     '01928000000070008000000000000032',
     TRUE,
     CURRENT_TIMESTAMP,
@@ -272,6 +282,71 @@ ON CONFLICT DO NOTHING;
 UPDATE employees
 SET monthly_allowance = 120.00
 WHERE id = '01928000-0000-7000-8000-000000000032' AND monthly_allowance = 0;
+
+-- 7.5 DEFAULT MERCHANT ACCOUNT (For affiliated merchant role)
+-- Default Credentials:
+--   Identifier / Email: comercio@ate.com
+--   Identifier / Document: 0943676158
+--   Password: Admin123*Ate
+INSERT INTO users (
+    id,
+    email,
+    password_hash,
+    is_active,
+    email_confirmed,
+    must_change_password,
+    created_at,
+    is_deleted
+)
+VALUES (
+    '01928000-0000-7000-8000-000000000040',
+    'comercio@ate.com',
+    '735zKhX+F8ep7goJoiIsrwyQv5wzp5GQOgbzwK7yH/tNCOCsLNWyWmwJUcKiRPzY',
+    TRUE,
+    TRUE,
+    FALSE,
+    CURRENT_TIMESTAMP,
+    FALSE
+)
+ON CONFLICT (email) DO NOTHING;
+
+INSERT INTO persons (
+    id,
+    user_id,
+    first_name,
+    last_name,
+    document_type,
+    document_number,
+    created_at,
+    is_deleted
+)
+VALUES (
+    '01928000-0000-7000-8000-000000000041',
+    '01928000-0000-7000-8000-000000000040',
+    'Comercio',
+    'Aliado',
+    'NationalId',
+    '0943676158',
+    CURRENT_TIMESTAMP,
+    FALSE
+)
+ON CONFLICT (document_type, document_number) DO NOTHING;
+
+UPDATE persons
+SET document_number = '0943676158'
+WHERE user_id = '01928000-0000-7000-8000-000000000040';
+
+INSERT INTO user_roles (
+    user_id,
+    role_id,
+    assigned_at
+)
+VALUES (
+    '01928000-0000-7000-8000-000000000040',
+    4,
+    CURRENT_TIMESTAMP
+)
+ON CONFLICT (user_id, role_id) DO NOTHING;
 
 -- 8. SAMPLE EMPLOYEES FOR ACME (Development demo data)
 --   Password for all sample accounts: Admin123*Ate
@@ -329,24 +404,32 @@ VALUES
     ('01928000-0000-7000-8000-000000000145', 3, CURRENT_TIMESTAMP)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO employees (id, company_id, person_id, employee_code, department, monthly_allowance, qr_code_token, is_active, created_at, is_deleted)
-SELECT v.id::uuid, c.id, p.id, v.code, v.department, v.allowance, replace(v.id, '-', ''), v.is_active, CURRENT_TIMESTAMP - (v.days_ago || ' days')::interval, FALSE
+INSERT INTO employees (id, company_id, person_id, employee_code, department, monthly_allowance, is_intern, qr_code_token, is_active, created_at, is_deleted)
+SELECT v.id::uuid, c.id, p.id, v.code, v.department, v.allowance, v.is_intern, replace(v.id, '-', ''), v.is_active, CURRENT_TIMESTAMP - (v.days_ago || ' days')::interval, FALSE
 FROM (VALUES
-    ('01928000-0000-7000-8000-000000000108', '0923456781', 'EMP-002', 'Talento Humano', 150.00, TRUE, 60),
-    ('01928000-0000-7000-8000-000000000111', '0934567812', 'EMP-003', 'Tecnología', 120.00, TRUE, 56),
-    ('01928000-0000-7000-8000-000000000114', '0945678123', 'EMP-004', 'Finanzas', 180.00, TRUE, 52),
-    ('01928000-0000-7000-8000-000000000117', '0956781234', 'EMP-005', 'Operaciones', 100.00, TRUE, 48),
-    ('01928000-0000-7000-8000-000000000120', '0967812345', 'EMP-006', 'Ventas', 130.00, TRUE, 44),
-    ('01928000-0000-7000-8000-000000000123', '0978123456', 'EMP-007', 'Tecnología', 160.00, TRUE, 40),
-    ('01928000-0000-7000-8000-000000000126', '0989234567', 'EMP-008', 'Administración', 110.00, FALSE, 36),
-    ('01928000-0000-7000-8000-000000000129', '0991345678', 'EMP-009', 'Operaciones', 100.00, TRUE, 32),
-    ('01928000-0000-7000-8000-000000000132', '0902456789', 'EMP-010', 'Ventas', 140.00, TRUE, 28),
-    ('01928000-0000-7000-8000-000000000135', '0913567890', 'EMP-011', 'Finanzas', 200.00, TRUE, 24),
-    ('01928000-0000-7000-8000-000000000138', '0924678901', 'EMP-012', 'Talento Humano', 120.00, FALSE, 20),
-    ('01928000-0000-7000-8000-000000000141', '0935789012', 'EMP-013', 'Tecnología', 175.00, TRUE, 16),
-    ('01928000-0000-7000-8000-000000000144', '0946890123', 'EMP-014', 'Administración', 115.00, TRUE, 12),
-    ('01928000-0000-7000-8000-000000000147', '0957901234', 'EMP-015', 'Operaciones', 105.00, TRUE, 8)
-) AS v(id, document_number, code, department, allowance, is_active, days_ago)
+    ('01928000-0000-7000-8000-000000000108', '0923456781', 'EMP-002', 'Talento Humano', 150.00, FALSE, TRUE, 60),
+    ('01928000-0000-7000-8000-000000000111', '0934567812', 'EMP-003', 'Tecnología', 120.00, FALSE, TRUE, 56),
+    ('01928000-0000-7000-8000-000000000114', '0945678123', 'EMP-004', 'Finanzas', 180.00, FALSE, TRUE, 52),
+    ('01928000-0000-7000-8000-000000000117', '0956781234', 'EMP-005', 'Operaciones', 100.00, FALSE, TRUE, 48),
+    ('01928000-0000-7000-8000-000000000120', '0967812345', 'EMP-006', 'Ventas', 130.00, FALSE, TRUE, 44),
+    ('01928000-0000-7000-8000-000000000123', '0978123456', 'EMP-007', 'Tecnología', 160.00, FALSE, TRUE, 40),
+    ('01928000-0000-7000-8000-000000000126', '0989234567', 'EMP-008', 'Administración', 110.00, FALSE, FALSE, 36),
+    ('01928000-0000-7000-8000-000000000129', '0991345678', 'EMP-009', 'Operaciones', 100.00, FALSE, TRUE, 32),
+    ('01928000-0000-7000-8000-000000000132', '0902456789', 'EMP-010', 'Ventas', 140.00, FALSE, TRUE, 28),
+    ('01928000-0000-7000-8000-000000000135', '0913567890', 'EMP-011', 'Finanzas', 200.00, FALSE, TRUE, 24),
+    ('01928000-0000-7000-8000-000000000138', '0924678901', 'EMP-012', 'Talento Humano', 120.00, FALSE, FALSE, 20),
+    ('01928000-0000-7000-8000-000000000141', '0935789012', 'EMP-013', 'Tecnología', 175.00, FALSE, TRUE, 16),
+    ('01928000-0000-7000-8000-000000000144', '0946890123', 'EMP-014', 'Administración', 115.00, TRUE, TRUE, 12),
+    ('01928000-0000-7000-8000-000000000147', '0957901234', 'EMP-015', 'Operaciones', 105.00, TRUE, TRUE, 8)
+) AS v(id, document_number, code, department, allowance, is_intern, is_active, days_ago)
 JOIN persons p ON p.document_number = v.document_number AND p.document_type = 'NationalId' AND p.is_deleted = FALSE
 JOIN companies c ON c.tax_id = '0990000001001' AND c.is_deleted = FALSE
 ON CONFLICT DO NOTHING;
+
+UPDATE employees
+SET is_intern = TRUE
+WHERE employee_code IN ('EMP-014', 'EMP-015');
+
+UPDATE employees
+SET is_intern = FALSE
+WHERE employee_code NOT IN ('EMP-014', 'EMP-015');

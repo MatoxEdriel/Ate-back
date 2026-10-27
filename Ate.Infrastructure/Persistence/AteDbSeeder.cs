@@ -6,24 +6,24 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Ate.Infrastructure.Persistence;
 
-public static class AteDbSeeder
+public static partial class AteDbSeeder
 {
-    private static readonly (string FirstName, string LastName, string DocumentNumber, string Email, string Code, string Department, decimal Allowance, bool IsActive)[] SampleEmployees =
+    private static readonly (string FirstName, string LastName, string DocumentNumber, string Email, string Code, string Department, decimal Allowance, bool IsIntern, bool IsActive)[] SampleEmployees =
     [
-        ("María Belén", "Cevallos Ruiz", "0923456781", "maria.cevallos@acme.com", "EMP-002", "Talento Humano", 150m, true),
-        ("José Andrés", "Paredes Vera", "0934567812", "jose.paredes@acme.com", "EMP-003", "Tecnología", 120m, true),
-        ("Ana Lucía", "Torres Mendoza", "0945678123", "ana.torres@acme.com", "EMP-004", "Finanzas", 180m, true),
-        ("Luis Fernando", "Zambrano Ortiz", "0956781234", "luis.zambrano@acme.com", "EMP-005", "Operaciones", 100m, true),
-        ("Gabriela", "Salazar Moreira", "0967812345", "gabriela.salazar@acme.com", "EMP-006", "Ventas", 130m, true),
-        ("Diego Alejandro", "Herrera Castro", "0978123456", "diego.herrera@acme.com", "EMP-007", "Tecnología", 160m, true),
-        ("Valeria", "Montalvo Quiñónez", "0989234567", "valeria.montalvo@acme.com", "EMP-008", "Administración", 110m, false),
-        ("Carlos Eduardo", "Villacís Romero", "0991345678", "carlos.villacis@acme.com", "EMP-009", "Operaciones", 100m, true),
-        ("Daniela", "Aguirre Pazmiño", "0902456789", "daniela.aguirre@acme.com", "EMP-010", "Ventas", 140m, true),
-        ("Miguel Ángel", "Rivadeneira León", "0913567890", "miguel.rivadeneira@acme.com", "EMP-011", "Finanzas", 200m, true),
-        ("Sofía", "Benítez Andrade", "0924678901", "sofia.benitez@acme.com", "EMP-012", "Talento Humano", 120m, false),
-        ("Andrés Sebastián", "Jaramillo Cruz", "0935789012", "andres.jaramillo@acme.com", "EMP-013", "Tecnología", 175m, true),
-        ("Paola Estefanía", "Navarrete Solís", "0946890123", "paola.navarrete@acme.com", "EMP-014", "Administración", 115m, true),
-        ("Ricardo", "Espinoza Guerrero", "0957901234", "ricardo.espinoza@acme.com", "EMP-015", "Operaciones", 105m, true)
+        ("María Belén", "Cevallos Ruiz", "0923456781", "maria.cevallos@acme.com", "EMP-002", "Talento Humano", 150m, false, true),
+        ("José Andrés", "Paredes Vera", "0934567812", "jose.paredes@acme.com", "EMP-003", "Tecnología", 120m, false, true),
+        ("Ana Lucía", "Torres Mendoza", "0945678123", "ana.torres@acme.com", "EMP-004", "Finanzas", 180m, false, true),
+        ("Luis Fernando", "Zambrano Ortiz", "0956781234", "luis.zambrano@acme.com", "EMP-005", "Operaciones", 100m, false, true),
+        ("Gabriela", "Salazar Moreira", "0967812345", "gabriela.salazar@acme.com", "EMP-006", "Ventas", 130m, false, true),
+        ("Diego Alejandro", "Herrera Castro", "0978123456", "diego.herrera@acme.com", "EMP-007", "Tecnología", 160m, false, true),
+        ("Valeria", "Montalvo Quiñónez", "0989234567", "valeria.montalvo@acme.com", "EMP-008", "Administración", 110m, false, false),
+        ("Carlos Eduardo", "Villacís Romero", "0991345678", "carlos.villacis@acme.com", "EMP-009", "Operaciones", 100m, false, true),
+        ("Daniela", "Aguirre Pazmiño", "0902456789", "daniela.aguirre@acme.com", "EMP-010", "Ventas", 140m, false, true),
+        ("Miguel Ángel", "Rivadeneira León", "0913567890", "miguel.rivadeneira@acme.com", "EMP-011", "Finanzas", 200m, false, true),
+        ("Sofía", "Benítez Andrade", "0924678901", "sofia.benitez@acme.com", "EMP-012", "Talento Humano", 120m, false, false),
+        ("Andrés Sebastián", "Jaramillo Cruz", "0935789012", "andres.jaramillo@acme.com", "EMP-013", "Tecnología", 175m, false, true),
+        ("Paola Estefanía", "Navarrete Solís", "0946890123", "paola.navarrete@acme.com", "EMP-014", "Administración", 115m, true, true),
+        ("Ricardo", "Espinoza Guerrero", "0957901234", "ricardo.espinoza@acme.com", "EMP-015", "Operaciones", 105m, true, true)
     ];
 
     public static async Task SeedAsync(AteDbContext context, IPasswordHasher passwordHasher)
@@ -33,7 +33,9 @@ public static class AteDbSeeder
         await SeedCompanyAdminAsync(context, passwordHasher, company);
         await SeedSuperAdminAsync(context, passwordHasher);
         await SeedDefaultEmployeeAsync(context, passwordHasher, company);
+        await SeedMerchantAsync(context, passwordHasher);
         await SeedSampleEmployeesAsync(context, passwordHasher, company);
+        await SeedRestaurantsAsync(context, company);
     }
 
     private static async Task<Company> SeedDefaultCompanyAsync(AteDbContext context)
@@ -168,7 +170,7 @@ public static class AteDbSeeder
     private static async Task SeedSuperAdminAsync(AteDbContext context, IPasswordHasher passwordHasher)
     {
         const string superAdminEmail = "superadmin@ate.com";
-        const string superAdminDocumentNumber = "0999999999";
+        const string superAdminDocumentNumber = "0943676157";
 
         var existingUser = await context.Users
             .IgnoreQueryFilters()
@@ -176,6 +178,16 @@ public static class AteDbSeeder
 
         if (existingUser != null)
         {
+            var existingPerson = await context.Persons
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(p => p.UserId == existingUser.Id);
+
+            if (existingPerson != null && existingPerson.DocumentNumber != superAdminDocumentNumber)
+            {
+                existingPerson.DocumentNumber = superAdminDocumentNumber;
+                await context.SaveChangesAsync();
+            }
+
             return;
         }
 
@@ -216,7 +228,7 @@ public static class AteDbSeeder
     private static async Task SeedDefaultEmployeeAsync(AteDbContext context, IPasswordHasher passwordHasher, Company company)
     {
         const string employeeEmail = "empleado@ate.com";
-        const string employeeDocumentNumber = "0912345678";
+        const string employeeDocumentNumber = "0943676156";
 
         var existingUser = await context.Users
             .IgnoreQueryFilters()
@@ -224,6 +236,16 @@ public static class AteDbSeeder
 
         if (existingUser != null)
         {
+            var existingPerson = await context.Persons
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(p => p.UserId == existingUser.Id);
+
+            if (existingPerson != null && existingPerson.DocumentNumber != employeeDocumentNumber)
+            {
+                existingPerson.DocumentNumber = employeeDocumentNumber;
+                await context.SaveChangesAsync();
+            }
+
             return;
         }
 
@@ -262,6 +284,7 @@ public static class AteDbSeeder
             EmployeeCode = "EMP-001",
             Department = "Tecnología",
             MonthlyAllowance = 120m,
+            IsIntern = false,
             IsActive = true
         };
 
@@ -269,6 +292,64 @@ public static class AteDbSeeder
         context.Persons.Add(person);
         context.UserRoles.Add(role);
         context.Employees.Add(employee);
+
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task SeedMerchantAsync(AteDbContext context, IPasswordHasher passwordHasher)
+    {
+        const string merchantEmail = "comercio@ate.com";
+        const string merchantDocumentNumber = "0943676158";
+
+        var existingUser = await context.Users
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(u => u.Email == merchantEmail);
+
+        if (existingUser != null)
+        {
+            var existingPerson = await context.Persons
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(p => p.UserId == existingUser.Id);
+
+            if (existingPerson != null && existingPerson.DocumentNumber != merchantDocumentNumber)
+            {
+                existingPerson.DocumentNumber = merchantDocumentNumber;
+                await context.SaveChangesAsync();
+            }
+
+            return;
+        }
+
+        var user = new User
+        {
+            Id = Guid.CreateVersion7(),
+            Email = merchantEmail,
+            PasswordHash = passwordHasher.HashPassword("Admin123*Ate"),
+            IsActive = true,
+            EmailConfirmed = true,
+            MustChangePassword = false
+        };
+
+        var person = new Person
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = user.Id,
+            FirstName = "Comercio",
+            LastName = "Aliado",
+            DocumentType = DocumentType.NationalId,
+            DocumentNumber = merchantDocumentNumber
+        };
+
+        var role = new UserRole
+        {
+            UserId = user.Id,
+            RoleId = 4,
+            AssignedAt = DateTimeOffset.UtcNow
+        };
+
+        context.Users.Add(user);
+        context.Persons.Add(person);
+        context.UserRoles.Add(role);
 
         await context.SaveChangesAsync();
     }
@@ -285,6 +366,28 @@ public static class AteDbSeeder
         var pending = SampleEmployees.Where(s => !existingDocuments.Contains(s.DocumentNumber)).ToList();
         if (pending.Count == 0)
         {
+            var existingCodes = SampleEmployees.Select(s => s.Code).ToList();
+            var existingEmployees = await context.Employees
+                .IgnoreQueryFilters()
+                .Where(e => e.CompanyId == company.Id && existingCodes.Contains(e.EmployeeCode!))
+                .ToListAsync();
+
+            var hasChanges = false;
+            foreach (var emp in existingEmployees)
+            {
+                var sample = SampleEmployees.FirstOrDefault(s => s.Code == emp.EmployeeCode);
+                if (sample.Code != null && emp.IsIntern != sample.IsIntern)
+                {
+                    emp.IsIntern = sample.IsIntern;
+                    hasChanges = true;
+                }
+            }
+
+            if (hasChanges)
+            {
+                await context.SaveChangesAsync();
+            }
+
             return;
         }
 
@@ -325,6 +428,7 @@ public static class AteDbSeeder
                 EmployeeCode = sample.Code,
                 Department = sample.Department,
                 MonthlyAllowance = sample.Allowance,
+                IsIntern = sample.IsIntern,
                 IsActive = sample.IsActive
             });
         }
