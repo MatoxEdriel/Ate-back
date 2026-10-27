@@ -20,6 +20,7 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
     private const string TicketChars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private const int TicketSuffixLength = 5;
     private const string WaterDrink = "Agua";
+    private const string JuiceDrink = "Jugo";
 
     /// <summary>Desde esta hora el desayuno que se pide corresponde al día siguiente (igual que el dashboard).</summary>
     private static readonly TimeOnly NextDayBreakfastFrom = new(22, 0);
@@ -57,11 +58,20 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
         var employee = await _context.Employees
             .AsNoTracking()
             .Include(e => e.Person)
+            .Include(e => e.Company)
             .FirstOrDefaultAsync(e => e.Person.UserId == userId && e.IsActive, cancellationToken);
 
         if (employee == null)
         {
             return Result.Failure<EmployeeOrderDto>(EmployeeOrderErrors.EmployeeNotFound);
+        }
+
+        var deliveryMode = EmployeeOrderDeliveryModes.Normalize(request.DeliveryMode) ?? EmployeeOrderDeliveryModes.Pickup;
+        var isDelivery = deliveryMode == EmployeeOrderDeliveryModes.Delivery;
+        var deliveryAddress = isDelivery ? employee.Company.Address?.Trim() : null;
+        if (isDelivery && string.IsNullOrEmpty(deliveryAddress))
+        {
+            return Result.Failure<EmployeeOrderDto>(EmployeeOrderErrors.DeliveryAddressMissing);
         }
 
         var businessNow = _dateTimeProvider.BusinessNow;
@@ -103,7 +113,7 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
 
         var drink = string.Equals(request.Drink?.Trim(), EmployeeOrderDrinks.Water, StringComparison.OrdinalIgnoreCase)
             ? WaterDrink
-            : dish.DefaultDrink;
+            : JuiceDrink;
 
         var item = new EmployeeOrderItem
         {
@@ -149,6 +159,8 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
                 }
             ],
             Notes = string.IsNullOrWhiteSpace(request.Notes) ? null : request.Notes.Trim(),
+            DeliveryMode = deliveryMode,
+            DeliveryAddress = deliveryAddress,
             OrderedAt = now,
             CreatedAt = now
         };
@@ -371,6 +383,8 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
                 .Select(h => new EmployeeOrderStatusChangeDto(h.Status, h.ChangedAt, h.Note))
                 .ToList(),
             order.Notes,
+            order.DeliveryMode,
+            order.DeliveryAddress,
             order.OrderedAt,
             order.UpdatedAt);
     }
