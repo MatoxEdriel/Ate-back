@@ -1,6 +1,7 @@
 using Ate.Api.Extensions;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Common.Models;
+using Ate.Application.Features.EmployeeOrders.DTOs;
 using Ate.Application.Features.Employees.DTOs;
 using Ate.Domain.Constants;
 using Ate.Domain.Errors;
@@ -17,10 +18,12 @@ namespace Ate.Api.Controllers;
 public class CompanyEmployeesController : ControllerBase
 {
     private readonly IEmployeeService _employeeService;
+    private readonly IEmployeeOrderService _employeeOrderService;
 
-    public CompanyEmployeesController(IEmployeeService employeeService)
+    public CompanyEmployeesController(IEmployeeService employeeService, IEmployeeOrderService employeeOrderService)
     {
         _employeeService = employeeService;
+        _employeeOrderService = employeeOrderService;
     }
 
     [HttpGet]
@@ -71,5 +74,21 @@ public class CompanyEmployeesController : ControllerBase
 
         var result = await _employeeService.UpdateStatusAsync(userId.Value, employeeId, request, cancellationToken);
         return result.ToActionResult(this, "Employee status updated successfully.");
+    }
+
+    [HttpGet("{employeeId:guid}/orders")]
+    [EndpointSummary("List the purchase / food orders of an employee")]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<EmployeeOrderDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<PagedResult<EmployeeOrderDto>>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetEmployeeOrders(Guid employeeId, [FromQuery] PaginationParams pagination, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return ResultExtensions.ToErrorActionResult<PagedResult<EmployeeOrderDto>>(AuthErrors.InvalidToken, this);
+        }
+
+        var result = await _employeeOrderService.GetCompanyEmployeeOrdersAsync(userId.Value, employeeId, pagination, cancellationToken);
+        return result.ToActionResult(this, "Employee orders retrieved successfully.");
     }
 }
