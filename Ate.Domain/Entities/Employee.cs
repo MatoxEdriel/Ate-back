@@ -11,6 +11,7 @@ public class Employee : BaseAuditableEntity
     public string? EmployeeCode { get; set; }
     public string? Department { get; set; }
     public decimal MonthlyAllowance { get; set; }
+    public bool IsIntern { get; set; }
     public string QrCodeToken { get; set; } = Guid.CreateVersion7().ToString("N");
     public bool IsActive { get; set; } = true;
 }

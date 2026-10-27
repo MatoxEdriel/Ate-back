@@ -8,6 +8,6 @@ public record EmployeeDto(
     string Email,
     string EmployeeCode,
     string Department,
-    decimal MonthlyAllowance,
+    bool IsIntern,
     bool IsActive,
     DateTimeOffset CreatedAt);

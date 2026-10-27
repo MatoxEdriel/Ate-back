@@ -120,7 +120,8 @@ public class EmployeeService : IEmployeeService, IScopedDependency
             Person = person,
             EmployeeCode = employeeCode,
             Department = request.Department.Trim(),
-            MonthlyAllowance = decimal.Round(request.MonthlyAllowance, 2),
+            MonthlyAllowance = 0m,
+            IsIntern = request.IsIntern,
             IsActive = true
         };
 
@@ -182,7 +183,7 @@ public class EmployeeService : IEmployeeService, IScopedDependency
             employee.Person.User?.Email ?? string.Empty,
             employee.EmployeeCode ?? string.Empty,
             employee.Department ?? string.Empty,
-            employee.MonthlyAllowance,
+            employee.IsIntern,
             employee.IsActive,
             employee.CreatedAt);
     }

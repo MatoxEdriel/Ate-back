@@ -23,6 +23,10 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .IsRequired()
             .HasDefaultValue(0m);
 
+        builder.Property(e => e.IsIntern)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(e => e.QrCodeToken)
             .HasMaxLength(255)
             .IsRequired();
