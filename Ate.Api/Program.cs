@@ -2,44 +2,67 @@ using Ate.Api;
 using Ate.Api.Extensions;
 using Ate.Application;
 using Ate.Infrastructure;
+using Serilog;
 
-var builder = WebApplication.CreateBuilder(args);
+Log.Logger = new LoggerConfiguration()
+    .WriteTo.Console()
+    .CreateBootstrapLogger();
 
-const string corsPolicyName = "FrontendCorsPolicy";
-builder.Services.AddCors(options =>
+try
 {
-    options.AddPolicy(corsPolicyName, policy =>
+    var builder = WebApplication.CreateBuilder(args);
+
+    builder.Host.UseSerilog((context, services, configuration) => configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .ReadFrom.Services(services)
+        .Enrich.FromLogContext());
+
+    const string corsPolicyName = "FrontendCorsPolicy";
+    builder.Services.AddCors(options =>
     {
-        policy.WithOrigins("http://localhost:4200", "http://localhost:3000")
-              .AllowAnyHeader()
-              .AllowAnyMethod()
-              .AllowCredentials();
+        options.AddPolicy(corsPolicyName, policy =>
+        {
+            policy.WithOrigins("http://localhost:4200", "http://localhost:3000")
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials();
+        });
     });
-});
 
-builder.Services.AddControllers();
-builder.Services.AddApiServices(builder.Configuration);
-builder.Services.AddApplication();
-builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddControllers();
+    builder.Services.AddApiServices(builder.Configuration);
+    builder.Services.AddApplication();
+    builder.Services.AddInfrastructure(builder.Configuration);
 
-var app = builder.Build();
+    var app = builder.Build();
 
-app.UseExceptionHandler();
+    app.UseSerilogRequestLogging();
 
-await app.InitialiseDatabaseAsync();
+    app.UseExceptionHandler();
 
-app.UseCors(corsPolicyName);
-app.UseAuthentication();
-app.UseAuthorization();
+    await app.InitialiseDatabaseAsync();
 
-app.UseScalarDocumentation();
+    app.UseCors(corsPolicyName);
+    app.UseAuthentication();
+    app.UseAuthorization();
 
-app.MapControllers();
+    app.UseScalarDocumentation();
 
-app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy", version = "1.0.3", timestamp = DateTimeOffset.UtcNow }))
-   .WithName("HealthCheck")
-   .WithTags("System Health")
-   .WithSummary("System health check")
-   .WithDescription("Returns API operational status and current server timestamp.");
+    app.MapControllers();
 
-app.Run();
+    app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy", version = "1.0.3", timestamp = DateTimeOffset.UtcNow }))
+       .WithName("HealthCheck")
+       .WithTags("System Health")
+       .WithSummary("System health check")
+       .WithDescription("Returns API operational status and current server timestamp.");
+
+    app.Run();
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "Application terminated unexpectedly");
+}
+finally
+{
+    Log.CloseAndFlush();
+}

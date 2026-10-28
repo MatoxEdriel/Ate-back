@@ -1,0 +1,19 @@
+<h2 style="margin-top: 0; color: #0f172a; font-size: 20px;">¡Bienvenido a Ate, {{ full_name }}!</h2>
+
+<p>Tu empresa te ha registrado en la plataforma <strong>Ate</strong> para que disfrutes de tu beneficio corporativo de alimentación y almuerzos en restaurantes afiliados.</p>
+
+<p>Para ingresar por primera vez a tu cuenta, utiliza las siguientes credenciales temporales:</p>
+
+<div class="highlight-box">
+  <p style="margin: 0 0 6px 0; font-size: 13px; color: #64748b; text-transform: uppercase; font-weight: 600;">Tus datos de acceso:</p>
+  <p style="margin: 0 0 4px 0;"><strong>Usuario / Email:</strong> {{ email }}</p>
+  <p style="margin: 0;"><strong>Contraseña temporal:</strong> <code style="background: #ffffff; padding: 2px 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-family: monospace; font-size: 14px; color: #ea580c;">{{ temporary_password }}</code></p>
+</div>
+
+<p>Por seguridad, el sistema te solicitará cambiar tu contraseña la primera vez que inicies sesión.</p>
+
+<div style="text-align: center;">
+  <a href="{{ login_url }}" class="btn" target="_blank">Iniciar Sesión en Ate</a>
+</div>
+
+<p style="font-size: 13px; color: #64748b; margin-top: 24px;">Si el botón no funciona, copia y pega el siguiente enlace en tu navegador:<br><a href="{{ login_url }}" style="color: #ea580c; word-break: break-all;">{{ login_url }}</a></p>

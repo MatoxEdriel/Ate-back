@@ -1,0 +1,18 @@
+<h2 style="margin-top: 0; color: #0f172a; font-size: 20px;">¡Tu pedido ha sido confirmado!</h2>
+
+<p>Hola <strong>{{ full_name }}</strong>,</p>
+
+<p>Tu orden para el servicio de <strong>{{ meal_type }}</strong> en <strong>{{ restaurant_name }}</strong> ha sido registrada exitosamente en el sistema.</p>
+
+<div class="highlight-box">
+  <p style="margin: 0 0 8px 0; font-size: 13px; color: #64748b; text-transform: uppercase; font-weight: 600;">Detalles del pedido:</p>
+  <p style="margin: 0 0 4px 0;"><strong>Número de Orden:</strong> {{ order_number }}</p>
+  <p style="margin: 0 0 4px 0;"><strong>Restaurante:</strong> {{ restaurant_name }}</p>
+  <p style="margin: 0 0 4px 0;"><strong>Total del Pedido:</strong> ${{ total_amount }}</p>
+  <div style="margin-top: 12px; padding: 10px; background: #ffffff; border-radius: 6px; border: 1px dashed #ea580c; text-align: center;">
+    <span style="font-size: 12px; color: #64748b; display: block;">Código de Reclamo / Retiro:</span>
+    <span style="font-size: 22px; font-weight: 800; letter-spacing: 2px; color: #ea580c;">{{ pickup_code }}</span>
+  </div>
+</div>
+
+<p>Presenta este código o tu código QR en el restaurante al momento de reclamar tu almuerzo.</p>

@@ -64,6 +64,13 @@ Los servidores leen las **Variables de Entorno** del sistema operativo, las cual
 | `JwtSettings:SecretKey` | `JwtSettings__SecretKey="ClaveSeguraProd2026..."` |
 | `ConnectionStrings:DefaultConnection` | `ConnectionStrings__DefaultConnection="Host=db.prod;Database=ate_prod;..."` |
 | `JwtSettings:ExpirationInMinutes` | `JwtSettings__ExpirationInMinutes="120"` |
+| `SmtpSettings:Host` | `SmtpSettings__Host="smtp.gmail.com"` |
+| `SmtpSettings:Port` | `SmtpSettings__Port="587"` |
+| `SmtpSettings:UserName` | `SmtpSettings__UserName="ga99buggi@gmail.com"` |
+| `SmtpSettings:Password` | `SmtpSettings__Password="xxxx xxxx xxxx xxxx"` (Google App Password) |
+| `SmtpSettings:SenderEmail` | `SmtpSettings__SenderEmail="ga99buggi@gmail.com"` |
+| `SmtpSettings:SenderName` | `SmtpSettings__SenderName="Ate Platform"` |
+| `SmtpSettings:EnableSsl` | `SmtpSettings__EnableSsl="true"` |
 
 ---
 
