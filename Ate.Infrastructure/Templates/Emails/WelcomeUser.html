@@ -1,19 +1,46 @@
-<h2 style="margin-top: 0; color: #0f172a; font-size: 20px;">¡Bienvenido a Ate, {{ full_name }}!</h2>
-
-<p>Tu empresa te ha registrado en la plataforma <strong>Ate</strong> para que disfrutes de tu beneficio corporativo de alimentación y almuerzos en restaurantes afiliados.</p>
-
-<p>Para ingresar por primera vez a tu cuenta, utiliza las siguientes credenciales temporales:</p>
-
-<div class="highlight-box">
-  <p style="margin: 0 0 6px 0; font-size: 13px; color: #64748b; text-transform: uppercase; font-weight: 600;">Tus datos de acceso:</p>
-  <p style="margin: 0 0 4px 0;"><strong>Usuario / Email:</strong> {{ email }}</p>
-  <p style="margin: 0;"><strong>Contraseña temporal:</strong> <code style="background: #ffffff; padding: 2px 6px; border-radius: 4px; border: 1px solid #cbd5e1; font-family: monospace; font-size: 14px; color: #ea580c;">{{ temporary_password }}</code></p>
+<div style="text-align: center; margin: 8px 0 20px 0;">
+  <svg width="130" height="74" viewBox="0 0 240 140" fill="none" xmlns="http://www.w3.org/2000/svg" style="display: inline-block;">
+    <ellipse cx="120" cy="132" rx="90" ry="7" fill="#EAE6DF" />
+    <path d="M28 128 C34 116 48 94 62 68 C76 42 96 22 120 22 C144 22 164 42 178 68 C192 94 206 116 212 128 Z" fill="#FAF8F3" stroke="#2B2D2F" stroke-width="4.5" stroke-linejoin="round" stroke-linecap="round" />
+    <path d="M120 22 C122 45 124 75 124 100 C124 115 122 124 120 128" fill="none" stroke="#2B2D2F" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="2 3" opacity="0.45" />
+    <g transform="translate(98, 64)">
+      <circle cx="0" cy="0" r="9" fill="#FFFFFF" stroke="#2B2D2F" stroke-width="3" />
+      <circle cx="1.5" cy="-0.5" r="4.5" fill="#2B2D2F" />
+      <circle cx="3" cy="-2" r="1.5" fill="#FFFFFF" />
+    </g>
+    <g transform="translate(142, 64)">
+      <circle cx="0" cy="0" r="9" fill="#FFFFFF" stroke="#2B2D2F" stroke-width="3" />
+      <circle cx="1.5" cy="-0.5" r="4.5" fill="#2B2D2F" />
+      <circle cx="3" cy="-2" r="1.5" fill="#FFFFFF" />
+    </g>
+    <path d="M115 78 Q120 84 125 78" fill="none" stroke="#2B2D2F" stroke-width="2.5" stroke-linecap="round" />
+  </svg>
 </div>
 
-<p>Por seguridad, el sistema te solicitará cambiar tu contraseña la primera vez que inicies sesión.</p>
-
-<div style="text-align: center;">
-  <a href="{{ login_url }}" class="btn" target="_blank">Iniciar Sesión en Ate</a>
+<div style="text-align: center; margin-bottom: 24px;">
+  <h2 style="margin: 0 0 8px 0; color: #14725B; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 24px; font-weight: 800; letter-spacing: -0.03em;">¡Hola, {{ full_name }}! 👋</h2>
+  <p style="margin: 0; font-size: 15px; color: #5C646B; line-height: 1.5;">Tu empresa te dio de alta en <strong>Ate</strong>.<br>Tu beneficio de alimentación ya está listo.</p>
 </div>
 
-<p style="font-size: 13px; color: #64748b; margin-top: 24px;">Si el botón no funciona, copia y pega el siguiente enlace en tu navegador:<br><a href="{{ login_url }}" style="color: #ea580c; word-break: break-all;">{{ login_url }}</a></p>
+<div class="highlight-box" style="margin: 0 auto 24px auto;">
+  <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
+    <tr>
+      <td style="padding: 4px 0; font-size: 13px; color: #6C757D; width: 130px;">Usuario</td>
+      <td style="padding: 4px 0; font-size: 14px; color: #2B2D2F; font-weight: 600; text-align: right;">{{ email }}</td>
+    </tr>
+    <tr>
+      <td style="padding: 8px 0 0 0; font-size: 13px; color: #6C757D;">Contraseña temporal</td>
+      <td style="padding: 8px 0 0 0; text-align: right;">
+        <span style="display: inline-block; background-color: #FFFFFF; border: 1.5px solid #14725B; color: #14725B; font-family: Consolas, 'Courier New', monospace; font-size: 14px; font-weight: 700; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.05em;">{{ temporary_password }}</span>
+      </td>
+    </tr>
+  </table>
+</div>
+
+<div style="text-align: center; margin: 0 0 18px 0;">
+  <a href="{{ login_url }}" class="btn" target="_blank">Ingresar a Ate &rarr;</a>
+</div>
+
+<p style="margin: 0; font-size: 12px; color: #8A94A0; text-align: center; line-height: 1.5;">
+  Podrás crear tu contraseña definitiva al ingresar por primera vez.
+</p>
