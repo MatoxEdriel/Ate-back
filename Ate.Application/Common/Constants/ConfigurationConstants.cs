@@ -36,5 +36,6 @@ public static class ConfigurationConstants
         public const string EnableSsl = "EnableSsl";
         public const string SupportEmail = "SupportEmail";
         public const string DefaultCcEmail = "DefaultCcEmail";
+        public const string ClientBaseUrl = "ClientBaseUrl";
     }
 }
