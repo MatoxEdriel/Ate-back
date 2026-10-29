@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Ate.Application.Common.Interfaces;
+using Ate.Application.Common.Models.Emails;
 using Ate.Application.Features.Employees.DTOs;
 using Ate.Domain.Common;
 using Ate.Domain.Constants;
@@ -8,6 +9,8 @@ using Ate.Domain.Enums;
 using Ate.Domain.Errors;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Ate.Infrastructure.Services;
 
@@ -22,15 +25,24 @@ public class EmployeeService : IEmployeeService, IScopedDependency
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IValidator<CreateEmployeeRequest> _createValidator;
+    private readonly IEmailService _emailService;
+    private readonly SmtpOptions _smtpOptions;
+    private readonly ILogger<EmployeeService> _logger;
 
     public EmployeeService(
         IApplicationDbContext context,
         IPasswordHasher passwordHasher,
-        IValidator<CreateEmployeeRequest> createValidator)
+        IValidator<CreateEmployeeRequest> createValidator,
+        IEmailService emailService,
+        IOptions<SmtpOptions> smtpOptions,
+        ILogger<EmployeeService> logger)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _createValidator = createValidator;
+        _emailService = emailService;
+        _smtpOptions = smtpOptions.Value;
+        _logger = logger;
     }
 
     public async Task<Result<IReadOnlyList<EmployeeDto>>> GetCompanyEmployeesAsync(Guid adminUserId, CancellationToken cancellationToken = default)
@@ -136,6 +148,26 @@ public class EmployeeService : IEmployeeService, IScopedDependency
         _context.Employees.Add(employee);
 
         await _context.SaveChangesAsync(cancellationToken);
+
+        try
+        {
+            var loginUrl = $"{_smtpOptions.ClientBaseUrl.TrimEnd('/')}/login";
+            var fullName = $"{person.FirstName} {person.LastName}".Trim();
+            await _emailService.SendTemplateEmailAsync(
+                user.Email,
+                "¡Bienvenido a Ate! Tu cuenta ha sido creada",
+                EmailTemplateType.WelcomeUser,
+                new WelcomeUserEmailModel(
+                    fullName,
+                    user.Email,
+                    temporaryPassword,
+                    loginUrl),
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send welcome email to {Email}", user.Email);
+        }
 
         return Result.Success(new CreateEmployeeResponse(ToDto(employee), temporaryPassword));
     }

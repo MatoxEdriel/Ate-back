@@ -32,4 +32,6 @@ public class SmtpOptions
 
     [EmailAddress(ErrorMessage = "SMTP DefaultCcEmail must be a valid email.")]
     public string? DefaultCcEmail { get; set; }
+
+    public string ClientBaseUrl { get; set; } = "http://localhost:4200";
 }
