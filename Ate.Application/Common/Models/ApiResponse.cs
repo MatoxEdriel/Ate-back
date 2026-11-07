@@ -6,6 +6,8 @@ public class ApiResponse<T>
     public string Message { get; init; } = string.Empty;
     public T? Data { get; init; }
     public IReadOnlyList<string>? Errors { get; init; }
+    /// <summary>Stable error code (e.g. "PasswordRecovery.CodeExpired") so clients can react without parsing the message.</summary>
+    public string? Code { get; init; }
     public DateTimeOffset Timestamp { get; init; }
 
     public static ApiResponse<T> SuccessResponse(T data, string message = "Operation completed successfully.")
@@ -20,7 +22,7 @@ public class ApiResponse<T>
         };
     }
 
-    public static ApiResponse<T> FailureResponse(string message, IReadOnlyList<string>? errors = null)
+    public static ApiResponse<T> FailureResponse(string message, IReadOnlyList<string>? errors = null, string? code = null)
     {
         return new ApiResponse<T>
         {
@@ -28,6 +30,7 @@ public class ApiResponse<T>
             Message = message,
             Data = default,
             Errors = errors ?? Array.Empty<string>(),
+            Code = string.IsNullOrEmpty(code) ? null : code,
             Timestamp = DateTimeOffset.UtcNow
         };
     }
@@ -38,6 +41,8 @@ public class ApiResponse
     public bool Success { get; init; }
     public string Message { get; init; } = string.Empty;
     public IReadOnlyList<string>? Errors { get; init; }
+    /// <summary>Stable error code (e.g. "PasswordRecovery.CodeExpired") so clients can react without parsing the message.</summary>
+    public string? Code { get; init; }
     public DateTimeOffset Timestamp { get; init; }
 
     public static ApiResponse SuccessResponse(string message = "Operation completed successfully.")
@@ -51,13 +56,14 @@ public class ApiResponse
         };
     }
 
-    public static ApiResponse FailureResponse(string message, IReadOnlyList<string>? errors = null)
+    public static ApiResponse FailureResponse(string message, IReadOnlyList<string>? errors = null, string? code = null)
     {
         return new ApiResponse
         {
             Success = false,
             Message = message,
             Errors = errors ?? Array.Empty<string>(),
+            Code = string.IsNullOrEmpty(code) ? null : code,
             Timestamp = DateTimeOffset.UtcNow
         };
     }

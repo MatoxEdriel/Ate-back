@@ -71,6 +71,11 @@ Los servidores leen las **Variables de Entorno** del sistema operativo, las cual
 | `SmtpSettings:SenderEmail` | `SmtpSettings__SenderEmail="ga99buggi@gmail.com"` |
 | `SmtpSettings:SenderName` | `SmtpSettings__SenderName="Ate Platform"` |
 | `SmtpSettings:EnableSsl` | `SmtpSettings__EnableSsl="true"` |
+| `PasswordRecovery:CodeLifetimeMinutes` | `PasswordRecovery__CodeLifetimeMinutes="10"` (vigencia del código OTP) |
+| `PasswordRecovery:ResetTokenLifetimeMinutes` | `PasswordRecovery__ResetTokenLifetimeMinutes="10"` (vigencia del token de reseteo) |
+| `PasswordRecovery:MaxAttempts` | `PasswordRecovery__MaxAttempts="5"` (intentos fallidos antes de invalidar el código) |
+| `PasswordRecovery:ResendCooldownSeconds` | `PasswordRecovery__ResendCooldownSeconds="30"` (espera mínima entre códigos) |
+| `PasswordRecovery:MaxCodesPerHour` | `PasswordRecovery__MaxCodesPerHour="5"` (códigos por cuenta y hora) |
 
 ---
 

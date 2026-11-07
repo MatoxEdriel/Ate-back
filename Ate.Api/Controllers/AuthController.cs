@@ -3,9 +3,11 @@ using Ate.Api.Extensions;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Common.Models;
 using Ate.Application.Features.Auth.DTOs;
+using Ate.Api.Filters;
 using Ate.Domain.Errors;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace Ate.Api.Controllers;
 
@@ -40,6 +42,7 @@ public class AuthController : ControllerBase
 
     [HttpGet("me")]
     [Authorize]
+    [AllowWhilePasswordChangeRequired]
     [EndpointSummary("Get current authenticated user profile")]
     [EndpointDescription("Returns authenticated identity profile extracted from the validated JWT claims.")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
@@ -62,6 +65,29 @@ public class AuthController : ControllerBase
         };
 
         return Ok(ApiResponse<object>.SuccessResponse(profile, "User profile retrieved successfully."));
+    }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    [AllowWhilePasswordChangeRequired]
+    [EnableRateLimiting(RateLimitPolicies.Credentials)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [EndpointSummary("Change the password of the signed-in user")]
+    [EndpointDescription("Sets the new password (8-128 characters). For the mandatory change of a temporary password (user.mustChangePassword) only newPassword is needed and it must differ from the temporary one; otherwise currentPassword is required. Clears the flag, revokes every other session and returns a fresh session. It is the only endpoint (with /me) allowed while the change is pending.")]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status429TooManyRequests)]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return ResultExtensions.ToErrorActionResult<LoginResponse>(AuthErrors.InvalidToken, this);
+        }
+
+        var result = await _authService.ChangePasswordAsync(userId.Value, request, cancellationToken);
+        return result.ToActionResult(this, "Contraseña actualizada.");
     }
 
     [HttpPost("dev-token")]

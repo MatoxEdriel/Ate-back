@@ -16,6 +16,15 @@ public static class AuthErrors
     public static readonly Error InvalidToken =
         Error.Unauthorized("Auth.InvalidToken", "No pudimos verificar tu identidad. Vuelve a iniciar sesión.");
 
+    public static readonly Error InvalidCurrentPassword =
+        Error.Validation("Auth.InvalidCurrentPassword", "La contraseña actual no es correcta.", details: null);
+
+    public static readonly Error PasswordReused =
+        Error.Validation("Auth.PasswordReused", "La nueva contraseña debe ser distinta de la temporal.", details: null);
+
+    public static readonly Error PasswordChangeRequired =
+        Error.Forbidden("Auth.PasswordChangeRequired", "Debes cambiar tu contraseña temporal antes de continuar.");
+
     public static readonly Error MissingCredentials =
         Error.Validation("Auth.MissingCredentials", "Ingresa tu cédula y contraseña.");
 }

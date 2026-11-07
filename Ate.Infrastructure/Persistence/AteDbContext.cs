@@ -24,6 +24,7 @@ public class AteDbContext : DbContext, IApplicationDbContext
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<Employee> Employees => Set<Employee>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+    public DbSet<PasswordRecovery> PasswordRecoveries => Set<PasswordRecovery>();
     public DbSet<UserExternalLogin> UserExternalLogins => Set<UserExternalLogin>();
     public DbSet<Restaurant> Restaurants => Set<Restaurant>();
     public DbSet<RestaurantDish> RestaurantDishes => Set<RestaurantDish>();

@@ -12,6 +12,7 @@ public interface IApplicationDbContext
     DbSet<Company> Companies { get; }
     DbSet<Employee> Employees { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
+    DbSet<PasswordRecovery> PasswordRecoveries { get; }
     DbSet<UserExternalLogin> UserExternalLogins { get; }
     DbSet<Restaurant> Restaurants { get; }
     DbSet<RestaurantDish> RestaurantDishes { get; }

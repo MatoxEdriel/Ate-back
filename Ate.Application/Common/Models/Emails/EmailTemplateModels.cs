@@ -11,6 +11,15 @@ public record PasswordResetEmailModel(
     string ResetUrl,
     int ExpirationMinutes);
 
+/// <param name="CodeDigits">The code split in digits, one box per digit in the template.</param>
+/// <param name="RequestedAt">When it was requested, in business time (dd/MM/yyyy HH:mm).</param>
+public record PasswordResetCodeEmailModel(
+    string FullName,
+    string Code,
+    IReadOnlyList<string> CodeDigits,
+    int ExpirationMinutes,
+    string RequestedAt);
+
 public record OrderConfirmationEmailModel(
     string OrderNumber,
     string FullName,

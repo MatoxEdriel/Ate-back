@@ -27,6 +27,15 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddSingleton<EmailQueue>();
+        services.AddSingleton<IEmailQueue>(sp => sp.GetRequiredService<EmailQueue>());
+        services.AddHostedService<EmailDispatchWorker>();
+
+        services.AddOptions<PasswordRecoveryOptions>()
+            .Bind(configuration.GetSection(PasswordRecoveryOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         var connectionString = configuration.GetConnectionString(ConfigurationConstants.ConnectionStrings.DefaultConnection)
             ?? throw new InvalidOperationException($"Connection string '{ConfigurationConstants.ConnectionStrings.DefaultConnection}' was not found.");
 

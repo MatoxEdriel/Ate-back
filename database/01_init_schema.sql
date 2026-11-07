@@ -2,7 +2,7 @@
 -- Ate Platform - Initial Schema DDL (PostgreSQL 16)
 -- Clean Architecture Identity & Onboarding Core
 -- Tables: roles, users, persons, user_roles, companies (users.company_id), employees,
---         refresh_tokens, user_external_logins, restaurants, restaurant_dishes,
+--         refresh_tokens, password_recoveries, user_external_logins, restaurants, restaurant_dishes,
 --         company_restaurant_agreements
 -- =============================================================================
 
@@ -175,6 +175,31 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     CONSTRAINT fk_refresh_tokens_users FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT uq_refresh_tokens_token UNIQUE (token)
 );
+
+-- 7b. PASSWORD_RECOVERIES (código OTP para restablecer la contraseña)
+-- Solo se guardan hashes. El código vence en code_expires_at; al verificarlo se emite un
+-- token de un solo uso que vence en reset_token_expires_at.
+CREATE TABLE IF NOT EXISTS password_recoveries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    code_hash VARCHAR(128) NOT NULL,
+    code_expires_at TIMESTAMPTZ NOT NULL,
+    attempts INT NOT NULL DEFAULT 0,
+    code_verified_at TIMESTAMPTZ NULL,
+    reset_token_hash VARCHAR(128) NULL,
+    reset_token_expires_at TIMESTAMPTZ NULL,
+    used_at TIMESTAMPTZ NULL,
+    invalidated_at TIMESTAMPTZ NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_password_recoveries_users FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ix_password_recoveries_user_created
+ON password_recoveries(user_id, created_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ix_password_recoveries_reset_token
+ON password_recoveries(reset_token_hash)
+WHERE reset_token_hash IS NOT NULL;
 
 -- 8. USER_EXTERNAL_LOGINS (Active Directory / Azure AD)
 CREATE TABLE IF NOT EXISTS user_external_logins (

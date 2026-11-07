@@ -860,7 +860,9 @@ Se eliminó el antipatrón de lanzar excepciones para flujos de negocio esperado
      * `Unauthorized` (401)
      * `Forbidden` (403)
      * `Conflict` (409)
+     * `TooManyRequests` (429) — límites de intentos (p. ej. código OTP de recuperación)
      * `Failure` (422/400)
+   * Las respuestas de error de `ApiResponse` incluyen `code` (p. ej. `"PasswordRecovery.CodeExpired"`) para que el cliente reaccione sin depender del texto.
    * **Cero clases basura:** Se evita crear clases estáticas dedicadas por cada entidad (`CompanyErrors`, `ProductErrors`). En su lugar, se usan los métodos genéricos en `Error`:
      * `Error.NotFound<Company>(id)` ➔ Genera código `"Company.NotFound"` y descripción `"Company with identifier '{id}' was not found."`
      * `Error.Conflict<Company>("RUC", ruc)` ➔ Genera código `"Company.Conflict"` y descripción `"Company with RUC '{ruc}' already exists."`

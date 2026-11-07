@@ -6,5 +6,6 @@ public enum EmailTemplateType
     PasswordReset = 2,
     OrderConfirmation = 3,
     OrderStatusChanged = 4,
-    MonthlyAllowanceRefill = 5
+    MonthlyAllowanceRefill = 5,
+    PasswordResetCode = 6
 }

@@ -24,6 +24,11 @@ public static class ConfigurationConstants
         public const string ExpirationInMinutes = "ExpirationInMinutes";
     }
 
+    public static class PasswordRecoverySettings
+    {
+        public const string SectionName = "PasswordRecovery";
+    }
+
     public static class SmtpSettings
     {
         public const string SectionName = "SmtpSettings";

@@ -58,6 +58,11 @@ public class JwtTokenGenerator : IJwtTokenGenerator, ISingletonDependency
             claims.Add(new Claim(ClaimTypes.Role, role));
         }
 
+        if (user.MustChangePassword)
+        {
+            claims.Add(new Claim(CustomClaimTypes.MustChangePassword, "true"));
+        }
+
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),

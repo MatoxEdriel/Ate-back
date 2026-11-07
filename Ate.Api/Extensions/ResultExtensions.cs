@@ -24,7 +24,7 @@ public static class ResultExtensions
 
     public static IActionResult ToErrorActionResult<T>(Error error, ControllerBase controller)
     {
-        var response = ApiResponse<T>.FailureResponse(error.Description, error.Details);
+        var response = ApiResponse<T>.FailureResponse(error.Description, error.Details, error.Code);
 
         return error.Type switch
         {
@@ -33,13 +33,14 @@ public static class ResultExtensions
             ErrorType.Conflict => controller.Conflict(response),
             ErrorType.Unauthorized => controller.Unauthorized(response),
             ErrorType.Forbidden => controller.StatusCode(StatusCodes.Status403Forbidden, response),
+            ErrorType.TooManyRequests => controller.StatusCode(StatusCodes.Status429TooManyRequests, response),
             _ => controller.BadRequest(response)
         };
     }
 
     public static IActionResult ToErrorActionResult(Error error, ControllerBase controller)
     {
-        var response = ApiResponse.FailureResponse(error.Description, error.Details);
+        var response = ApiResponse.FailureResponse(error.Description, error.Details, error.Code);
 
         return error.Type switch
         {
@@ -48,6 +49,7 @@ public static class ResultExtensions
             ErrorType.Conflict => controller.Conflict(response),
             ErrorType.Unauthorized => controller.Unauthorized(response),
             ErrorType.Forbidden => controller.StatusCode(StatusCodes.Status403Forbidden, response),
+            ErrorType.TooManyRequests => controller.StatusCode(StatusCodes.Status429TooManyRequests, response),
             _ => controller.BadRequest(response)
         };
     }
