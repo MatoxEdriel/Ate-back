@@ -12,6 +12,8 @@ public class Restaurant : BaseAuditableEntity
     public string Cuisine { get; set; } = string.Empty;
     public string? Address { get; set; }
     public string? Phone { get; set; }
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
     public string BrandColor { get; set; } = "#B5532E";
     public string? LogoUrl { get; set; }
     public string? Icon { get; set; }

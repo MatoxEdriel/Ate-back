@@ -41,7 +41,7 @@ public class MerchantRestaurantController : ControllerBase
 
     [HttpPut]
     [EndpointSummary("Update the profile of the merchant's restaurant")]
-    [EndpointDescription("Name, cuisine, address, phone, brand color and preparation time. The new name shows up for employees and in the dish catalog right away.")]
+    [EndpointDescription("Name, cuisine, address, phone, brand color, preparation time, map location and order cutoff times. cutoff is optional and only the meals present (desayuno, almuerzo, merienda, as HH:mm) are changed. The new name and cutoff show up for employees right away.")]
     [ProducesResponseType(typeof(ApiResponse<MerchantRestaurantDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<MerchantRestaurantDto>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<MerchantRestaurantDto>), StatusCodes.Status403Forbidden)]

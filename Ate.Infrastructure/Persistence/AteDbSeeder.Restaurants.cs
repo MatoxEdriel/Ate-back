@@ -23,11 +23,13 @@ public static partial class AteDbSeeder
         int ReadyMinutes,
         string BrandColor,
         string Icon,
+        decimal Latitude,
+        decimal Longitude,
         SeedDish[] Dishes);
 
     private static readonly SeedRestaurant[] SampleRestaurants =
     [
-        new("patio", "El Patio Criollo", "Criolla", 250, 15, "#B5532E", "cubiertos",
+        new("patio", "El Patio Criollo", "Criolla", 250, 15, "#B5532E", "cubiertos", -2.190200m, -79.888300m,
         [
             new(MealType.Breakfast, "Bolón de verde con chicharrón", "Cerdo", "Huevo frito y queso fresco.", false),
             new(MealType.Breakfast, "Tigrillo", "Vegetariano", "Verde majado con huevo y queso.", false),
@@ -37,7 +39,7 @@ public static partial class AteDbSeeder
             new(MealType.Dinner, "Seco de carne", "Res", "Arroz, maduro y ensalada.", true),
             new(MealType.Dinner, "Pollo a la plancha", "Pollo", "Arroz, menestra y ensalada.", true)
         ]),
-        new("mercedes", "Comedor Doña Mercedes", "Casera", 400, 10, "#8A5A2B", "olla",
+        new("mercedes", "Comedor Doña Mercedes", "Casera", 400, 10, "#8A5A2B", "olla", -2.187100m, -79.890500m,
         [
             new(MealType.Breakfast, "Caldo de gallina", "Pollo", "Con yuca y pan.", false),
             new(MealType.Breakfast, "Humitas", "Vegetariano", "Dos humitas con queso.", false),
@@ -46,7 +48,7 @@ public static partial class AteDbSeeder
             new(MealType.Dinner, "Arroz con menestra y carne", "Res", "Patacones y ensalada.", true),
             new(MealType.Dinner, "Caldo de bolas de verde", "Res", "Bolas de verde rellenas y maní.", false)
         ]),
-        new("verde", "Verde Bowl", "Saludable", 600, 20, "#2F7A3E", "hoja",
+        new("verde", "Verde Bowl", "Saludable", 600, 20, "#2F7A3E", "hoja", -2.192500m, -79.886000m,
         [
             new(MealType.Breakfast, "Bowl de avena y frutas", "Vegetariano", "Frutas de temporada y granola.", false),
             new(MealType.Breakfast, "Tostadas con aguacate", "Vegetariano", "Pan integral, huevo pochado y aguacate.", false),
@@ -55,7 +57,7 @@ public static partial class AteDbSeeder
             new(MealType.Dinner, "Wrap de pollo", "Pollo", "Vegetales frescos y salsa de yogur.", false),
             new(MealType.Dinner, "Bowl de quinoa y vegetales", "Vegetariano", "Quinoa, vegetales asados y aguacate.", false)
         ]),
-        new("sazon", "La Sazón Manabita", "Manabita", 750, 20, "#1F6F9F", "pescado",
+        new("sazon", "La Sazón Manabita", "Manabita", 750, 20, "#1F6F9F", "pescado", -2.185000m, -79.892500m,
         [
             new(MealType.Breakfast, "Encebollado", "Pescado", "Con yuca, chifles y limón.", false),
             new(MealType.Breakfast, "Bolón mixto", "Cerdo", "Queso, chicharrón y huevo frito.", false),
@@ -102,6 +104,8 @@ public static partial class AteDbSeeder
                     Cuisine = seed.Cuisine,
                     BrandColor = seed.BrandColor,
                     Icon = seed.Icon,
+                    Latitude = seed.Latitude,
+                    Longitude = seed.Longitude,
                     ReadyMinutes = seed.ReadyMinutes,
                     BreakfastCutoff = new TimeOnly(9, 0),
                     LunchCutoff = new TimeOnly(11, 30),
@@ -134,6 +138,12 @@ public static partial class AteDbSeeder
                 }
 
                 context.Restaurants.Add(restaurant);
+            }
+
+            if (!restaurant.Latitude.HasValue || !restaurant.Longitude.HasValue)
+            {
+                restaurant.Latitude = seed.Latitude;
+                restaurant.Longitude = seed.Longitude;
             }
 
             if (!existingAgreements.Contains(restaurant.Id))

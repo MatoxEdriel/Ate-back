@@ -34,6 +34,12 @@ public class RestaurantConfiguration : IEntityTypeConfiguration<Restaurant>
         builder.Property(r => r.Phone)
             .HasMaxLength(30);
 
+        builder.Property(r => r.Latitude)
+            .HasColumnType("numeric(9,6)");
+
+        builder.Property(r => r.Longitude)
+            .HasColumnType("numeric(9,6)");
+
         builder.Property(r => r.BrandColor)
             .HasMaxLength(7)
             .IsRequired();

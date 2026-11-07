@@ -197,6 +197,8 @@ CREATE TABLE IF NOT EXISTS restaurants (
     cuisine VARCHAR(80) NOT NULL,
     address VARCHAR(300) NULL,
     phone VARCHAR(30) NULL,
+    latitude NUMERIC(9,6) NULL,
+    longitude NUMERIC(9,6) NULL,
     brand_color VARCHAR(7) NOT NULL,
     logo_url VARCHAR(500) NULL,
     icon VARCHAR(30) NULL,
@@ -215,6 +217,20 @@ CREATE TABLE IF NOT EXISTS restaurants (
     CONSTRAINT fk_restaurants_users FOREIGN KEY (merchant_user_id) REFERENCES users(id) ON DELETE SET NULL,
     CONSTRAINT ck_restaurants_ready_minutes CHECK (ready_minutes >= 0)
 );
+
+ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS latitude NUMERIC(9,6) NULL;
+ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS longitude NUMERIC(9,6) NULL;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_restaurants_location') THEN
+        ALTER TABLE restaurants
+            ADD CONSTRAINT ck_restaurants_location CHECK (
+                (latitude IS NULL AND longitude IS NULL)
+                OR (latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180)
+            );
+    END IF;
+END $$;
 
 CREATE UNIQUE INDEX IF NOT EXISTS ix_restaurants_code
 ON restaurants(code)

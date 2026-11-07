@@ -1,4 +1,6 @@
+using System.Globalization;
 using Ate.Application.Features.MerchantRestaurant.DTOs;
+using Ate.Application.Features.Restaurants;
 using FluentValidation;
 
 namespace Ate.Application.Features.MerchantRestaurant.Validators;
@@ -35,8 +37,32 @@ public class UpdateMerchantRestaurantRequestValidator : AbstractValidator<Update
             .Matches(@"^#[0-9A-Fa-f]{6}$")
             .WithMessage("El color debe tener el formato #RRGGBB.");
 
+        RuleFor(x => x)
+            .Must(x => x.Latitude.HasValue == x.Longitude.HasValue)
+            .WithName("Location")
+            .WithMessage("Ingresa la latitud y la longitud juntas, o deja ambas vacías.");
+
+        RuleFor(x => x.Latitude)
+            .InclusiveBetween(-90m, 90m)
+            .When(x => x.Latitude.HasValue)
+            .WithMessage("La latitud debe estar entre -90 y 90.");
+
+        RuleFor(x => x.Longitude)
+            .InclusiveBetween(-180m, 180m)
+            .When(x => x.Longitude.HasValue)
+            .WithMessage("La longitud debe estar entre -180 y 180.");
+
+        RuleFor(x => x.Cutoff)
+            .Must(cutoff => cutoff == null || cutoff.Keys.All(code => MealTypeCodes.TryParse(code, out _)))
+            .WithMessage("Las horas límite solo pueden ser de desayuno, almuerzo o merienda.")
+            .Must(cutoff => cutoff == null || cutoff.Values.All(BeValidTime))
+            .WithMessage("Cada hora límite debe tener el formato HH:mm (por ejemplo 11:30).");
+
         RuleFor(x => x.ReadyMinutes)
             .InclusiveBetween(5, 120)
             .WithMessage("El tiempo de preparación debe estar entre 5 y 120 minutos.");
     }
+
+    private static bool BeValidTime(string? time) =>
+        TimeOnly.TryParseExact(time?.Trim(), "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out _);
 }

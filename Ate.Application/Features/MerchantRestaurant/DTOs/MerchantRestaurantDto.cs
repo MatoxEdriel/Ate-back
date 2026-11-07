@@ -10,7 +10,10 @@ public record MerchantRestaurantDto(
     string BrandColor,
     string? LogoUrl,
     int ReadyMinutes,
-    bool IsActive);
+    bool IsActive,
+    decimal? Latitude,
+    decimal? Longitude,
+    IReadOnlyDictionary<string, string> Cutoff);
 
 public record UpdateMerchantRestaurantRequest(
     string Name,
@@ -18,4 +21,7 @@ public record UpdateMerchantRestaurantRequest(
     string? Address,
     string? Phone,
     string BrandColor,
-    int ReadyMinutes);
+    int ReadyMinutes,
+    decimal? Latitude = null,
+    decimal? Longitude = null,
+    IReadOnlyDictionary<string, string>? Cutoff = null);
