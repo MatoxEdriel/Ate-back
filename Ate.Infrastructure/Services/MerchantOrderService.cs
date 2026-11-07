@@ -74,8 +74,7 @@ public class MerchantOrderService : IMerchantOrderService, IScopedDependency
             .SortBy(o => o.OrderedAt)
             .ToListAsync(cancellationToken);
 
-        var companyNames = await GetCompanyNamesAsync(orders.Select(o => o.CompanyId), cancellationToken);
-        IReadOnlyList<MerchantOrderDto> result = orders.Select(o => ToDto(o, companyNames)).ToList();
+        IReadOnlyList<MerchantOrderDto> result = orders.Select(ToDto).ToList();
         return Result.Success(result);
     }
 
@@ -144,8 +143,7 @@ public class MerchantOrderService : IMerchantOrderService, IScopedDependency
             return Result.Failure<MerchantOrderDto>(MerchantOrderErrors.InvalidTransition);
         }
 
-        var companyNames = await GetCompanyNamesAsync([updated.CompanyId], cancellationToken);
-        return Result.Success(ToDto(updated, companyNames));
+        return Result.Success(ToDto(updated));
     }
 
     private async Task<Guid?> GetRestaurantIdAsync(Guid merchantUserId, CancellationToken cancellationToken)
@@ -157,21 +155,7 @@ public class MerchantOrderService : IMerchantOrderService, IScopedDependency
             .FirstOrDefaultAsync(cancellationToken);
     }
 
-    private async Task<Dictionary<Guid, string>> GetCompanyNamesAsync(IEnumerable<Guid> companyIds, CancellationToken cancellationToken)
-    {
-        var ids = companyIds.Distinct().ToList();
-        if (ids.Count == 0)
-        {
-            return [];
-        }
-
-        return await _context.Companies
-            .AsNoTracking()
-            .Where(c => ids.Contains(c.Id))
-            .ToDictionaryAsync(c => c.Id, c => string.IsNullOrWhiteSpace(c.TradeName) ? c.BusinessName : c.TradeName, cancellationToken);
-    }
-
-    private static MerchantOrderDto ToDto(EmployeeOrder order, IReadOnlyDictionary<Guid, string> companyNames)
+    private static MerchantOrderDto ToDto(EmployeeOrder order)
     {
         return new MerchantOrderDto(
             order.Id,
@@ -179,8 +163,6 @@ public class MerchantOrderService : IMerchantOrderService, IScopedDependency
             order.EmployeeName,
             order.EmployeeDocument,
             order.EmployeeCode,
-            order.Department,
-            companyNames.GetValueOrDefault(order.CompanyId, string.Empty),
             MealTypeCodes.ToCode(order.MealType),
             order.ServiceDate,
             order.Items

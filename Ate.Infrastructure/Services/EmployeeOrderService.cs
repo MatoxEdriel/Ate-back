@@ -22,9 +22,6 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
     private const string WaterDrink = "Agua";
     private const string JuiceDrink = "Jugo";
 
-    /// <summary>Desde esta hora el desayuno que se pide corresponde al día siguiente (igual que el dashboard).</summary>
-    private static readonly TimeOnly NextDayBreakfastFrom = new(22, 0);
-
     private static readonly string[] CancellableStatuses = [EmployeeOrderStatus.Pending];
 
     private readonly IApplicationDbContext _context;
@@ -75,10 +72,7 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
         }
 
         var businessNow = _dateTimeProvider.BusinessNow;
-        var today = DateOnly.FromDateTime(businessNow.DateTime);
-        var currentTime = TimeOnly.FromDateTime(businessNow.DateTime);
-        var isNextDayBreakfast = mealType == MealType.Breakfast && currentTime >= NextDayBreakfastFrom;
-        var serviceDate = isNextDayBreakfast ? today.AddDays(1) : today;
+        var serviceDate = ServiceDay.ServiceDateFor(mealType, businessNow);
 
         var agreement = await _context.CompanyRestaurantAgreements
             .AsNoTracking()
@@ -94,7 +88,7 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
 
         var restaurant = agreement.Restaurant;
         var cutoff = restaurant.GetCutoff(mealType);
-        if (!isNextDayBreakfast && cutoff.HasValue && currentTime > cutoff.Value)
+        if (!ServiceDay.IsOrderingOpen(mealType, cutoff, businessNow))
         {
             return Result.Failure<EmployeeOrderDto>(EmployeeOrderErrors.OrderingClosed);
         }

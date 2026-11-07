@@ -33,7 +33,8 @@ public class RestaurantService : IRestaurantService, IScopedDependency
             return Result.Failure<IReadOnlyList<RestaurantDto>>(EmployeeOrderErrors.EmployeeNotFound);
         }
 
-        var today = DateOnly.FromDateTime(_dateTimeProvider.BusinessNow.DateTime);
+        var businessNow = _dateTimeProvider.BusinessNow;
+        var today = DateOnly.FromDateTime(businessNow.DateTime);
 
         var agreements = await _context.CompanyRestaurantAgreements
             .AsNoTracking()
@@ -48,18 +49,20 @@ public class RestaurantService : IRestaurantService, IScopedDependency
             .ThenBy(a => a.Restaurant.Name)
             .ToListAsync(cancellationToken);
 
-        IReadOnlyList<RestaurantDto> result = agreements.Select(ToDto).ToList();
+        IReadOnlyList<RestaurantDto> result = agreements.Select(a => ToDto(a, businessNow)).ToList();
         return Result.Success(result);
     }
 
-    private static RestaurantDto ToDto(CompanyRestaurantAgreement agreement)
+    private static RestaurantDto ToDto(CompanyRestaurantAgreement agreement, DateTimeOffset businessNow)
     {
         var restaurant = agreement.Restaurant;
 
         var cutoff = new Dictionary<string, string>();
+        var orderingOpen = new Dictionary<string, bool>();
         foreach (var mealType in Enum.GetValues<MealType>())
         {
             var time = restaurant.GetCutoff(mealType);
+            orderingOpen[MealTypeCodes.ToCode(mealType)] = ServiceDay.IsOrderingOpen(mealType, time, businessNow);
             if (time.HasValue)
             {
                 cutoff[MealTypeCodes.ToCode(mealType)] = time.Value.ToString("HH:mm");
@@ -84,7 +87,11 @@ public class RestaurantService : IRestaurantService, IScopedDependency
             restaurant.BrandColor,
             restaurant.LogoUrl,
             restaurant.Icon,
+            restaurant.Latitude.HasValue && restaurant.Longitude.HasValue
+                ? new RestaurantLocationDto(restaurant.Latitude.Value, restaurant.Longitude.Value)
+                : null,
             cutoff,
+            orderingOpen,
             menu);
     }
 }
