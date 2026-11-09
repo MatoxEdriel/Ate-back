@@ -33,6 +33,10 @@ public class AchievementService : IAchievementService, IScopedDependency
         _dateTimeProvider = dateTimeProvider;
     }
 
+    /// <remarks>
+    /// Platinum is evaluated last because it depends on every other trophy. Unlocked trophies keep
+    /// their best progress, so a broken streak never takes one away.
+    /// </remarks>
     public async Task<int> EvaluateAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         await EvaluationLock.WaitAsync(cancellationToken);
@@ -49,7 +53,6 @@ public class AchievementService : IAchievementService, IScopedDependency
             var now = _dateTimeProvider.UtcNow;
             var newlyUnlocked = 0;
 
-            // Platinum goes last: it depends on the result of every other trophy.
             foreach (var definition in definitions.OrderBy(d => d.Metric == AchievementMetrics.AllTrophies))
             {
                 var target = TargetOf(definition, definitions);
@@ -69,7 +72,6 @@ public class AchievementService : IAchievementService, IScopedDependency
                     existing[definition.Code] = row;
                 }
 
-                // Unlocked trophies keep their best progress: a broken streak does not take them away.
                 var shownProgress = row.UnlockedAt != null ? Math.Max(row.Progress, progress) : progress;
                 if (row.Progress != shownProgress)
                 {
@@ -94,9 +96,9 @@ public class AchievementService : IAchievementService, IScopedDependency
         }
     }
 
+    /// <remarks>Evaluating on read keeps the room fresh and makes new trophies retroactive for this user.</remarks>
     public async Task<Result<AchievementsOverviewDto>> GetOverviewAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        // Evaluating on read keeps the room fresh and makes new trophies retroactive for this user.
         await EvaluateAsync(userId, cancellationToken);
 
         var definitions = await ActiveDefinitionsAsync(cancellationToken);

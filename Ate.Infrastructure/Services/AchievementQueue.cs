@@ -3,12 +3,14 @@ using Ate.Application.Common.Interfaces;
 
 namespace Ate.Infrastructure.Services;
 
-/// <summary>In-memory bounded queue of user ids consumed by <see cref="AchievementWorker"/>.</summary>
+/// <summary>
+/// In-memory bounded queue of user ids consumed by <see cref="AchievementWorker"/>.
+/// A dropped item is harmless: progress is recomputed from the orders on the next evaluation.
+/// </summary>
 public sealed class AchievementQueue : IAchievementQueue
 {
     private const int Capacity = 1000;
 
-    // A dropped item is harmless: progress is recomputed from the orders on the next evaluation.
     private readonly Channel<Guid> _channel = Channel.CreateBounded<Guid>(new BoundedChannelOptions(Capacity)
     {
         FullMode = BoundedChannelFullMode.DropWrite,

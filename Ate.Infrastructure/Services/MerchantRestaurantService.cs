@@ -38,6 +38,10 @@ public class MerchantRestaurantService : IMerchantRestaurantService, IScopedDepe
             : Result.Success(ToDto(restaurant));
     }
 
+    /// <remarks>
+    /// TEMPORAL: el logo se guarda tal cual como data URL base64; con el servidor de imágenes aquí se
+    /// subirá el archivo y se guardará su URL.
+    /// </remarks>
     public async Task<Result<MerchantRestaurantDto>> UpdateAsync(Guid merchantUserId, UpdateMerchantRestaurantRequest request, CancellationToken cancellationToken = default)
     {
         var validationResult = await _updateValidator.ValidateAsync(request, cancellationToken);
@@ -80,8 +84,6 @@ public class MerchantRestaurantService : IMerchantRestaurantService, IScopedDepe
         restaurant.Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
         restaurant.BrandColor = request.BrandColor.Trim().ToUpperInvariant();
         restaurant.ReadyMinutes = request.ReadyMinutes;
-        // TEMPORAL: se guarda la data URL tal cual; con el servidor de imágenes aquí se subirá el archivo
-        // y se guardará su URL.
         if (request.Logo != null)
         {
             restaurant.LogoUrl = request.Logo.Length == 0 ? null : request.Logo;

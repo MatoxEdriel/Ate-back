@@ -44,8 +44,6 @@ public class RestaurantConfiguration : IEntityTypeConfiguration<Restaurant>
             .HasMaxLength(7)
             .IsRequired();
 
-        // TEMPORAL: text porque el logo va serializado en base64. Con el servidor de imágenes
-        // volverá a HasMaxLength(500) con la URL del archivo.
         builder.Property(r => r.LogoUrl)
             .HasColumnType("text");
 

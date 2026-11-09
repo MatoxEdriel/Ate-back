@@ -144,7 +144,6 @@ public class MerchantOrderService : IMerchantOrderService, IScopedDependency
             return Result.Failure<MerchantOrderDto>(MerchantOrderErrors.InvalidTransition);
         }
 
-        // Only a delivered order adds trophy progress; evaluated in the background.
         if (target == EmployeeOrderStatus.Delivered)
         {
             _achievementQueue.TryEnqueue(updated.UserId);
