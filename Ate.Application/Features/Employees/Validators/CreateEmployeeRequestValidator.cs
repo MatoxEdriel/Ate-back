@@ -1,4 +1,5 @@
 using Ate.Application.Features.Employees.DTOs;
+using Ate.Application.Common.Validation;
 using FluentValidation;
 
 namespace Ate.Application.Features.Employees.Validators;
@@ -8,10 +9,13 @@ public class CreateEmployeeRequestValidator : AbstractValidator<CreateEmployeeRe
     public CreateEmployeeRequestValidator()
     {
         RuleFor(x => x.DocumentNumber)
+            .Cascade(CascadeMode.Stop)
             .NotEmpty()
             .WithMessage("Ingresa la cédula del colaborador.")
             .Matches(@"^\d{10}$")
-            .WithMessage("La cédula debe tener 10 dígitos.");
+            .WithMessage("La cédula debe tener 10 dígitos.")
+            .ValidEcuadorianNationalId()
+            .WithMessage("La cédula ingresada no es válida.");
 
         RuleFor(x => x.FirstName)
             .NotEmpty()
