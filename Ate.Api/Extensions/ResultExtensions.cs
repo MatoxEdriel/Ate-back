@@ -25,6 +25,7 @@ public static class ResultExtensions
     public static IActionResult ToErrorActionResult<T>(Error error, ControllerBase controller)
     {
         var response = ApiResponse<T>.FailureResponse(error.Description, error.Details, error.Code);
+        SetRetryAfter(error, controller);
 
         return error.Type switch
         {
@@ -41,6 +42,7 @@ public static class ResultExtensions
     public static IActionResult ToErrorActionResult(Error error, ControllerBase controller)
     {
         var response = ApiResponse.FailureResponse(error.Description, error.Details, error.Code);
+        SetRetryAfter(error, controller);
 
         return error.Type switch
         {
@@ -52,5 +54,14 @@ public static class ResultExtensions
             ErrorType.TooManyRequests => controller.StatusCode(StatusCodes.Status429TooManyRequests, response),
             _ => controller.BadRequest(response)
         };
+    }
+
+    private static void SetRetryAfter(Error error, ControllerBase controller)
+    {
+        if (error.RetryAfter is not { } retryAfter || controller.HttpContext is null)
+            return;
+
+        var seconds = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalSeconds));
+        controller.Response.Headers.RetryAfter = seconds.ToString(System.Globalization.CultureInfo.InvariantCulture);
     }
 }

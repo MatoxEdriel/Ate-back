@@ -36,6 +36,11 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddOptions<LoginThrottlingOptions>()
+            .Bind(configuration.GetSection(LoginThrottlingOptions.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
         var connectionString = configuration.GetConnectionString(ConfigurationConstants.ConnectionStrings.DefaultConnection)
             ?? throw new InvalidOperationException($"Connection string '{ConfigurationConstants.ConnectionStrings.DefaultConnection}' was not found.");
 

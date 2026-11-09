@@ -9,7 +9,7 @@ public class LoginRequestValidator : AbstractValidator<LoginRequest>
     {
         RuleFor(x => x.DocumentNumber)
             .NotEmpty()
-            .WithMessage("Ingresa tu cédula o pasaporte.");
+            .WithMessage("Ingresa tu cédula.");
 
         RuleFor(x => x.Password)
             .NotEmpty()

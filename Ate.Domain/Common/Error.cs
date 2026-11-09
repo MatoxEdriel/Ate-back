@@ -6,13 +6,16 @@ public readonly record struct Error
     public string Description { get; }
     public ErrorType Type { get; }
     public IReadOnlyList<string>? Details { get; }
+    /// <summary>How long the client must wait before retrying (sent as the Retry-After header).</summary>
+    public TimeSpan? RetryAfter { get; }
 
-    private Error(string code, string description, ErrorType type, IReadOnlyList<string>? details = null)
+    private Error(string code, string description, ErrorType type, IReadOnlyList<string>? details = null, TimeSpan? retryAfter = null)
     {
         Code = code;
         Description = description;
         Type = type;
         Details = details;
+        RetryAfter = retryAfter;
     }
 
     public static Error None => new(string.Empty, string.Empty, ErrorType.Failure);
@@ -58,6 +61,9 @@ public readonly record struct Error
 
     public static Error TooManyRequests(string code, string description) =>
         new(code, description, ErrorType.TooManyRequests);
+
+    public static Error TooManyRequests(string code, string description, TimeSpan retryAfter) =>
+        new(code, description, ErrorType.TooManyRequests, retryAfter: retryAfter);
 
     public static Error Forbidden(string code, string description) =>
         new(code, description, ErrorType.Forbidden);

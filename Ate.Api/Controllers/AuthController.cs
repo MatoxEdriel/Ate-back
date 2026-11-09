@@ -28,15 +28,18 @@ public class AuthController : ControllerBase
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.Login)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [EndpointSummary("Authenticate user with national ID (cédula)")]
-    [EndpointDescription("Authenticates person with national ID (cédula / document number) and password. Returns standardized ApiResponse with JWT access token, refresh token, and profile.")]
+    [EndpointDescription("Authenticates a person by national ID (cédula, document type NationalId) and password; outer spaces are trimmed and leading zeros kept. An unknown cédula and a wrong password both answer 401 Auth.InvalidCredentials; 403 Auth.UserInactive is only returned when the password is correct. Failed attempts are limited per cédula and IP (429 with Retry-After).")]
     [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request, CancellationToken cancellationToken)
     {
-        var result = await _authService.LoginAsync(request, cancellationToken);
+        var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var result = await _authService.LoginAsync(request, clientIp, cancellationToken);
         return result.ToActionResult(this, "User authenticated successfully.");
     }
 

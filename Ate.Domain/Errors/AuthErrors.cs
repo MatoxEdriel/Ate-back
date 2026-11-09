@@ -13,6 +13,16 @@ public static class AuthErrors
     public static readonly Error UserInactive =
         Error.Forbidden("Auth.UserInactive", "Tu cuenta está desactivada o bloqueada. Comunícate con un administrador.");
 
+    public static Error TooManyLoginAttempts(TimeSpan retryAfter)
+    {
+        var minutes = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalMinutes));
+        var unit = minutes == 1 ? "minuto" : "minutos";
+        return Error.TooManyRequests(
+            "Auth.TooManyLoginAttempts",
+            $"Demasiados intentos de inicio de sesión. Espera {minutes} {unit} e inténtalo de nuevo.",
+            retryAfter);
+    }
+
     public static readonly Error InvalidToken =
         Error.Unauthorized("Auth.InvalidToken", "No pudimos verificar tu identidad. Vuelve a iniciar sesión.");
 

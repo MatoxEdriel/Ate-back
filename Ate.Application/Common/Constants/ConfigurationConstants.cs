@@ -29,6 +29,11 @@ public static class ConfigurationConstants
         public const string SectionName = "PasswordRecovery";
     }
 
+    public static class LoginThrottlingSettings
+    {
+        public const string SectionName = "LoginThrottling";
+    }
+
     public static class SmtpSettings
     {
         public const string SectionName = "SmtpSettings";

@@ -30,7 +30,6 @@ try
     });
 
     builder.Services.AddControllers(options =>
-        // While an account has a temporary password, only the endpoints that allow it can be used.
         options.Filters.Add<Ate.Api.Filters.PasswordChangeRequiredFilter>());
     builder.Services.AddApiServices(builder.Configuration);
     builder.Services.AddApplication();
@@ -45,8 +44,8 @@ try
     await app.InitialiseDatabaseAsync();
 
     app.UseCors(corsPolicyName);
-    app.UseRateLimiter();
     app.UseAuthentication();
+    app.UseRateLimiter();
     app.UseAuthorization();
 
     app.UseScalarDocumentation();

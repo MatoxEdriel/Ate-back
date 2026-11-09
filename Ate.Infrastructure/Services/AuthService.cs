@@ -3,6 +3,7 @@ using Ate.Application.Features.Auth.DTOs;
 using Ate.Domain.Common;
 using Ate.Domain.Constants;
 using Ate.Domain.Entities;
+using Ate.Domain.Enums;
 using Ate.Domain.Errors;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +18,7 @@ public class AuthService : IAuthService, IScopedDependency
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IValidator<LoginRequest> _loginValidator;
     private readonly IValidator<ChangePasswordRequest> _changePasswordValidator;
+    private readonly ILoginAttemptLimiter _loginAttemptLimiter;
 
     public AuthService(
         IApplicationDbContext context,
@@ -24,7 +26,8 @@ public class AuthService : IAuthService, IScopedDependency
         IJwtTokenGenerator jwtTokenGenerator,
         IDateTimeProvider dateTimeProvider,
         IValidator<LoginRequest> loginValidator,
-        IValidator<ChangePasswordRequest> changePasswordValidator)
+        IValidator<ChangePasswordRequest> changePasswordValidator,
+        ILoginAttemptLimiter loginAttemptLimiter)
     {
         _context = context;
         _passwordHasher = passwordHasher;
@@ -32,18 +35,29 @@ public class AuthService : IAuthService, IScopedDependency
         _dateTimeProvider = dateTimeProvider;
         _loginValidator = loginValidator;
         _changePasswordValidator = changePasswordValidator;
+        _loginAttemptLimiter = loginAttemptLimiter;
     }
 
-    public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
+    private static string? _dummyPasswordHash;
+
+    /// <summary>Hash with the same cost as a real one, verified when no account matches.</summary>
+    private string GetDummyPasswordHash() =>
+        _dummyPasswordHash ??= _passwordHasher.HashPassword(Guid.NewGuid().ToString("N"));
+
+    public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, string? clientIp = null, CancellationToken cancellationToken = default)
     {
         var validationResult = await _loginValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
-            var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
-            return Result.Failure<LoginResponse>(Error.Validation("Auth.MissingCredentials", "Revisa los datos ingresados.", errors));
+            return Result.Failure<LoginResponse>(AuthErrors.InvalidCredentials);
         }
 
         var normalizedDocumentNumber = request.DocumentNumber.Trim();
+
+        if (_loginAttemptLimiter.GetRetryAfter(normalizedDocumentNumber, clientIp) is { } retryAfter)
+        {
+            return Result.Failure<LoginResponse>(AuthErrors.TooManyLoginAttempts(retryAfter));
+        }
 
         var user = await _context.Users
             .AsNoTracking()
@@ -51,27 +65,29 @@ public class AuthService : IAuthService, IScopedDependency
             .Include(u => u.Company)
             .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
-            .FirstOrDefaultAsync(u => !u.IsDeleted && u.Person != null && u.Person.DocumentNumber == normalizedDocumentNumber, cancellationToken);
+            .FirstOrDefaultAsync(u =>
+                !u.IsDeleted &&
+                u.Person != null &&
+                u.Person.DocumentType == DocumentType.NationalId &&
+                u.Person.DocumentNumber == normalizedDocumentNumber,
+                cancellationToken);
 
-        if (user == null)
+        var hasUsableHash = !string.IsNullOrEmpty(user?.PasswordHash);
+        var isValidPassword = _passwordHasher.VerifyPassword(
+            request.Password,
+            hasUsableHash ? user!.PasswordHash! : GetDummyPasswordHash());
+
+        if (user == null || !hasUsableHash || !isValidPassword)
         {
+            _loginAttemptLimiter.RegisterFailure(normalizedDocumentNumber, clientIp);
             return Result.Failure<LoginResponse>(AuthErrors.InvalidCredentials);
         }
+
+        _loginAttemptLimiter.Reset(normalizedDocumentNumber, clientIp);
 
         if (!user.IsActive)
         {
             return Result.Failure<LoginResponse>(AuthErrors.UserInactive);
-        }
-
-        if (string.IsNullOrEmpty(user.PasswordHash))
-        {
-            return Result.Failure<LoginResponse>(AuthErrors.InvalidCredentials);
-        }
-
-        var isValidPassword = _passwordHasher.VerifyPassword(request.Password, user.PasswordHash);
-        if (!isValidPassword)
-        {
-            return Result.Failure<LoginResponse>(AuthErrors.InvalidCredentials);
         }
 
         var roles = user.UserRoles
@@ -147,8 +163,6 @@ public class AuthService : IAuthService, IScopedDependency
 
         if (user.MustChangePassword)
         {
-            // Mandatory change: the session was opened with the temporary password moments ago,
-            // so it is not asked again; it just cannot be kept.
             if (!string.IsNullOrEmpty(user.PasswordHash) && _passwordHasher.VerifyPassword(request.NewPassword, user.PasswordHash))
             {
                 return Result.Failure<LoginResponse>(AuthErrors.PasswordReused);
@@ -165,7 +179,6 @@ public class AuthService : IAuthService, IScopedDependency
         user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
         user.MustChangePassword = false;
 
-        // A new password closes every other session (they were opened with the old one).
         var activeTokens = await _context.RefreshTokens
             .Where(t => t.UserId == user.Id && !t.IsRevoked)
             .ToListAsync(cancellationToken);
@@ -180,7 +193,6 @@ public class AuthService : IAuthService, IScopedDependency
             .Distinct()
             .ToList();
 
-        // Fresh session: the new access token no longer carries the must_change_password claim.
         var (accessToken, expiresAt) = _jwtTokenGenerator.GenerateToken(user, roles);
         var refreshTokenString = _jwtTokenGenerator.GenerateRefreshToken();
         _context.RefreshTokens.Add(new RefreshToken
