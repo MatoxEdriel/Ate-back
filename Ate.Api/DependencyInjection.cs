@@ -1,10 +1,13 @@
 using System.Text;
 using Ate.Api.Middlewares;
+using Ate.Api.OpenApi;
 using Ate.Api.Services;
 using Ate.Application.Common.Constants;
 using System.Threading.RateLimiting;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Common.Models;
+using Ate.Domain.Common;
+using Ate.Domain.Errors;
 using Ate.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using System.Globalization;
@@ -16,7 +19,12 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddApiServices(this IServiceCollection services, IConfiguration configuration)
     {
-        services.AddOpenApi();
+        services.AddOpenApi(options =>
+        {
+            options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+            options.AddOperationTransformer<AuthorizationResponsesTransformer>();
+            options.AddOperationTransformer<OperationIdTransformer>();
+        });
         services.AddHttpContextAccessor();
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
@@ -44,6 +52,16 @@ public static class DependencyInjection
                 ValidAudience = jwtOptions.Audience,
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.SecretKey)),
                 ClockSkew = TimeSpan.Zero
+            };
+            options.Events = new JwtBearerEvents
+            {
+                OnChallenge = async context =>
+                {
+                    context.HandleResponse();
+                    await WriteAuthErrorAsync(context.Response, StatusCodes.Status401Unauthorized, AuthErrors.InvalidToken);
+                },
+                OnForbidden = context =>
+                    WriteAuthErrorAsync(context.Response, StatusCodes.Status403Forbidden, AuthErrors.Forbidden)
             };
         });
 
@@ -104,5 +122,14 @@ public static class DependencyInjection
         });
 
         return services;
+    }
+
+    private static async Task WriteAuthErrorAsync(HttpResponse response, int statusCode, Error error)
+    {
+        if (response.HasStarted)
+            return;
+
+        response.StatusCode = statusCode;
+        await response.WriteAsJsonAsync(ApiResponse.FailureResponse(error.Description, null, error.Code));
     }
 }

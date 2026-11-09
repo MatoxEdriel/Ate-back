@@ -1,3 +1,4 @@
+using Ate.Api.Filters;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Common.Models;
 using Ate.Application.Common.Models.Emails;
@@ -12,7 +13,8 @@ namespace Ate.Api.Controllers;
 [ApiController]
 [Route("api/v1/notifications")]
 [Produces("application/json")]
-[Tags("Notifications")]
+[Tags("Development")]
+[DevelopmentOnly]
 public class NotificationsController : ControllerBase
 {
     private readonly IEmailService _emailService;
@@ -27,9 +29,10 @@ public class NotificationsController : ControllerBase
     [HttpPost("test-welcome-email")]
     [AllowAnonymous]
     [EndpointSummary("Send a test welcome email")]
-    [EndpointDescription("Sends a welcome email with temporary password using Ate brand design to verify SMTP delivery.")]
+    [EndpointDescription("Development only (404 in any other environment). Sends a welcome email with a temporary password using the Ate brand design to verify SMTP delivery.")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status500InternalServerError)]
     public async Task<IActionResult> SendTestWelcomeEmail([FromBody] SendTestWelcomeEmailRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.ToEmail))

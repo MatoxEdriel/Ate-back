@@ -1,3 +1,4 @@
+using Ate.Api.OpenApi;
 using Scalar.AspNetCore;
 
 namespace Ate.Api.Extensions;
@@ -13,7 +14,8 @@ public static class ScalarExtensions
             {
                 options.WithTitle("Ate API Reference")
                        .WithTheme(ScalarTheme.Moon)
-                       .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient);
+                       .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient)
+                       .AddPreferredSecuritySchemes(BearerSecuritySchemeTransformer.SchemeName);
             });
 
             app.MapGet("/", () => Results.Redirect("/scalar/v1")).ExcludeFromDescription();

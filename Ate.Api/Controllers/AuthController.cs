@@ -18,12 +18,10 @@ namespace Ate.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;
-    private readonly IWebHostEnvironment _environment;
 
-    public AuthController(IAuthService authService, IWebHostEnvironment environment)
+    public AuthController(IAuthService authService)
     {
         _authService = authService;
-        _environment = environment;
     }
 
     [HttpPost("login")]
@@ -47,27 +45,25 @@ public class AuthController : ControllerBase
     [Authorize]
     [AllowWhilePasswordChangeRequired]
     [EndpointSummary("Get current authenticated user profile")]
-    [EndpointDescription("Returns authenticated identity profile extracted from the validated JWT claims.")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [EndpointDescription("Returns the identity of the signed-in user, read from the validated JWT claims. Allowed while a temporary password change is pending.")]
+    [ProducesResponseType(typeof(ApiResponse<CurrentUserDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<CurrentUserDto>), StatusCodes.Status401Unauthorized)]
     public IActionResult GetCurrentUser()
     {
         var userId = User.GetUserId();
         if (!userId.HasValue)
         {
-            return ResultExtensions.ToErrorActionResult<object>(AuthErrors.InvalidToken, this);
+            return ResultExtensions.ToErrorActionResult<CurrentUserDto>(AuthErrors.InvalidToken, this);
         }
 
-        var profile = new
-        {
-            id = userId.Value,
-            email = User.GetEmail(),
-            fullName = User.GetFullName(),
-            documentNumber = User.GetDocumentNumber(),
-            roles = User.GetRoles()
-        };
+        var profile = new CurrentUserDto(
+            userId.Value,
+            User.GetEmail(),
+            User.GetFullName(),
+            User.GetDocumentNumber(),
+            User.GetRoles());
 
-        return Ok(ApiResponse<object>.SuccessResponse(profile, "User profile retrieved successfully."));
+        return Ok(ApiResponse<CurrentUserDto>.SuccessResponse(profile, "User profile retrieved successfully."));
     }
 
     [HttpPost("change-password")]
@@ -95,34 +91,26 @@ public class AuthController : ControllerBase
 
     [HttpPost("dev-token")]
     [AllowAnonymous]
+    [DevelopmentOnly]
+    [Tags("Development")]
     [EndpointSummary("Generate development bypass token")]
-    [EndpointDescription("Generates a valid JWT access token for local development and endpoint testing without requiring credentials.")]
+    [EndpointDescription("Development only (404 in any other environment). Generates a valid JWT access token for local endpoint testing without credentials.")]
     [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GenerateDevToken([FromBody] DevTokenRequest? request, CancellationToken cancellationToken)
     {
-        if (!_environment.IsDevelopment())
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<LoginResponse>.FailureResponse("Development bypass token generation is only allowed in Development environment."));
-        }
-
         var result = await _authService.GenerateDevTokenAsync(request, cancellationToken);
         return result.ToActionResult(this, "Development token generated successfully.");
     }
 
     [HttpGet("dev-token")]
     [AllowAnonymous]
+    [DevelopmentOnly]
+    [Tags("Development")]
     [EndpointSummary("Generate development bypass token (quick GET)")]
-    [EndpointDescription("Quick GET endpoint to retrieve a valid development JWT access token with default or specified role.")]
+    [EndpointDescription("Development only (404 in any other environment). Quick GET to retrieve a development JWT access token with the default or the given role.")]
     [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status403Forbidden)]
     public async Task<IActionResult> GetDevToken([FromQuery] string? role, [FromQuery] string? email, CancellationToken cancellationToken)
     {
-        if (!_environment.IsDevelopment())
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<LoginResponse>.FailureResponse("Development bypass token generation is only allowed in Development environment."));
-        }
-
         var request = new DevTokenRequest(role, email);
         var result = await _authService.GenerateDevTokenAsync(request, cancellationToken);
         return result.ToActionResult(this, "Development token generated successfully.");

@@ -26,6 +26,9 @@ public static class AuthErrors
     public static readonly Error InvalidToken =
         Error.Unauthorized("Auth.InvalidToken", "No pudimos verificar tu identidad. Vuelve a iniciar sesión.");
 
+    public static readonly Error Forbidden =
+        Error.Forbidden("Auth.Forbidden", "No tienes permiso para realizar esta acción.");
+
     public static readonly Error InvalidCurrentPassword =
         Error.Validation("Auth.InvalidCurrentPassword", "La contraseña actual no es correcta.", details: null);
 
