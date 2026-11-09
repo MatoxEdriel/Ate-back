@@ -15,11 +15,16 @@ public class MerchantRestaurantService : IMerchantRestaurantService, IScopedDepe
 {
     private readonly IApplicationDbContext _context;
     private readonly IValidator<UpdateMerchantRestaurantRequest> _updateValidator;
+    private readonly IPasswordHasher _passwordHasher;
 
-    public MerchantRestaurantService(IApplicationDbContext context, IValidator<UpdateMerchantRestaurantRequest> updateValidator)
+    public MerchantRestaurantService(
+        IApplicationDbContext context,
+        IValidator<UpdateMerchantRestaurantRequest> updateValidator,
+        IPasswordHasher passwordHasher)
     {
         _context = context;
         _updateValidator = updateValidator;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<Result<MerchantRestaurantDto>> GetAsync(Guid merchantUserId, CancellationToken cancellationToken = default)
@@ -50,12 +55,37 @@ public class MerchantRestaurantService : IMerchantRestaurantService, IScopedDepe
             return Result.Failure<MerchantRestaurantDto>(MerchantOrderErrors.RestaurantNotFound);
         }
 
+        if (ChangesSensitiveData(restaurant, request))
+        {
+            if (string.IsNullOrEmpty(request.CurrentPassword))
+            {
+                return Result.Failure<MerchantRestaurantDto>(MerchantRestaurantErrors.PasswordRequired);
+            }
+
+            var passwordHash = await _context.Users
+                .AsNoTracking()
+                .Where(u => u.Id == merchantUserId)
+                .Select(u => u.PasswordHash)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (string.IsNullOrEmpty(passwordHash) || !_passwordHasher.VerifyPassword(request.CurrentPassword, passwordHash))
+            {
+                return Result.Failure<MerchantRestaurantDto>(MerchantRestaurantErrors.InvalidPassword);
+            }
+        }
+
         restaurant.Name = request.Name.Trim();
         restaurant.Cuisine = request.Cuisine.Trim();
         restaurant.Address = string.IsNullOrWhiteSpace(request.Address) ? null : request.Address.Trim();
         restaurant.Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
         restaurant.BrandColor = request.BrandColor.Trim().ToUpperInvariant();
         restaurant.ReadyMinutes = request.ReadyMinutes;
+        // TEMPORAL: se guarda la data URL tal cual; con el servidor de imágenes aquí se subirá el archivo
+        // y se guardará su URL.
+        if (request.Logo != null)
+        {
+            restaurant.LogoUrl = request.Logo.Length == 0 ? null : request.Logo;
+        }
         ApplyCutoff(restaurant, request.Cutoff);
         restaurant.Latitude = request.Latitude.HasValue ? Math.Round(request.Latitude.Value, 6) : null;
         restaurant.Longitude = request.Longitude.HasValue ? Math.Round(request.Longitude.Value, 6) : null;
@@ -63,6 +93,23 @@ public class MerchantRestaurantService : IMerchantRestaurantService, IScopedDepe
         await _context.SaveChangesAsync(cancellationToken);
 
         return Result.Success(ToDto(restaurant));
+    }
+
+    /// <summary>
+    /// What employees use to find the venue (name, phone, address, map location and logo):
+    /// changing it requires the merchant's password. Cuisine, color, times and cutoff do not.
+    /// </summary>
+    private static bool ChangesSensitiveData(Restaurant restaurant, UpdateMerchantRestaurantRequest request)
+    {
+        static string? Normalize(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        static decimal? Round(decimal? value) => value.HasValue ? Math.Round(value.Value, 6) : null;
+
+        return request.Name.Trim() != restaurant.Name
+            || Normalize(request.Address) != restaurant.Address
+            || Normalize(request.Phone) != restaurant.Phone
+            || Round(request.Latitude) != restaurant.Latitude
+            || Round(request.Longitude) != restaurant.Longitude
+            || (request.Logo != null && (request.Logo.Length == 0 ? null : request.Logo) != restaurant.LogoUrl);
     }
 
     private static void ApplyCutoff(Restaurant restaurant, IReadOnlyDictionary<string, string>? cutoff)

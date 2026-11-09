@@ -38,15 +38,18 @@ public class MerchantOrderService : IMerchantOrderService, IScopedDependency
     private readonly IApplicationDbContext _context;
     private readonly IMongoCollection<EmployeeOrder> _orders;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IAchievementQueue _achievementQueue;
 
     public MerchantOrderService(
         IApplicationDbContext context,
         IMongoDbContext mongoContext,
-        IDateTimeProvider dateTimeProvider)
+        IDateTimeProvider dateTimeProvider,
+        IAchievementQueue achievementQueue)
     {
         _context = context;
         _orders = mongoContext.GetCollection<EmployeeOrder>(MongoCollections.EmployeeOrders);
         _dateTimeProvider = dateTimeProvider;
+        _achievementQueue = achievementQueue;
     }
 
     public async Task<Result<IReadOnlyList<MerchantOrderDto>>> GetOrdersAsync(Guid merchantUserId, string? serviceDate, CancellationToken cancellationToken = default)
@@ -139,6 +142,12 @@ public class MerchantOrderService : IMerchantOrderService, IScopedDependency
         if (updated == null)
         {
             return Result.Failure<MerchantOrderDto>(MerchantOrderErrors.InvalidTransition);
+        }
+
+        // Only a delivered order adds trophy progress; evaluated in the background.
+        if (target == EmployeeOrderStatus.Delivered)
+        {
+            _achievementQueue.TryEnqueue(updated.UserId);
         }
 
         return Result.Success(ToDto(updated));

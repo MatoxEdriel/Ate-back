@@ -225,7 +225,8 @@ CREATE TABLE IF NOT EXISTS restaurants (
     latitude NUMERIC(9,6) NULL,
     longitude NUMERIC(9,6) NULL,
     brand_color VARCHAR(7) NOT NULL,
-    logo_url VARCHAR(500) NULL,
+    -- TEMPORAL: guarda el logo serializado como data URL base64 hasta tener el servidor de imágenes.
+    logo_url TEXT NULL,
     icon VARCHAR(30) NULL,
     ready_minutes INT NOT NULL DEFAULT 15,
     breakfast_cutoff TIME NULL,
@@ -245,6 +246,10 @@ CREATE TABLE IF NOT EXISTS restaurants (
 
 ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS latitude NUMERIC(9,6) NULL;
 ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS longitude NUMERIC(9,6) NULL;
+
+-- TEMPORAL: el logo viaja serializado (data URL base64) hasta que exista el servidor de imágenes.
+-- Cuando exista, volver a VARCHAR(500) con la URL pública del archivo.
+ALTER TABLE restaurants ALTER COLUMN logo_url TYPE TEXT;
 
 DO $$
 BEGIN
@@ -319,3 +324,62 @@ CREATE TABLE IF NOT EXISTS company_restaurant_agreements (
 CREATE UNIQUE INDEX IF NOT EXISTS ix_agreements_company_restaurant
 ON company_restaurant_agreements(company_id, restaurant_id)
 WHERE is_deleted = FALSE;
+
+-- 12. ACHIEVEMENTS (Employee trophies, PlayStation style)
+-- The catalog is data: a new trophy over an existing metric is one row here, no code change.
+-- Progress is a cache that can always be recomputed from employee_orders (MongoDB).
+CREATE TABLE IF NOT EXISTS achievement_definitions (
+    code VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(80) NOT NULL,
+    description VARCHAR(200) NOT NULL,
+    tier VARCHAR(10) NOT NULL,
+    icon VARCHAR(30) NOT NULL,
+    metric VARCHAR(40) NOT NULL,
+    threshold INT NOT NULL,
+    is_hidden BOOLEAN NOT NULL DEFAULT FALSE,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT ck_achievement_definitions_tier CHECK (tier IN ('bronze', 'silver', 'gold', 'platinum')),
+    CONSTRAINT ck_achievement_definitions_threshold CHECK (threshold > 0)
+);
+
+CREATE TABLE IF NOT EXISTS user_achievements (
+    user_id UUID NOT NULL,
+    achievement_code VARCHAR(50) NOT NULL,
+    progress INT NOT NULL DEFAULT 0,
+    unlocked_at TIMESTAMPTZ NULL,
+    seen_at TIMESTAMPTZ NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_user_achievements PRIMARY KEY (user_id, achievement_code),
+    CONSTRAINT fk_user_achievements_users FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_achievements_definitions FOREIGN KEY (achievement_code) REFERENCES achievement_definitions(code) ON DELETE CASCADE,
+    CONSTRAINT ck_user_achievements_progress CHECK (progress >= 0)
+);
+
+-- Unlocked trophies the employee has not seen yet (the unlock toast reads this).
+CREATE INDEX IF NOT EXISTS ix_user_achievements_unseen
+ON user_achievements(user_id)
+WHERE unlocked_at IS NOT NULL AND seen_at IS NULL;
+
+-- Initial catalog. Platinum (metric all_trophies) is computed against every other active trophy.
+INSERT INTO achievement_definitions (code, name, description, tier, icon, metric, threshold, is_hidden, sort_order)
+VALUES
+    ('first_bite',      'Primer bocado',    'Recibe tu primer pedido.',                          'bronze',   'utensils', 'delivered_orders',     1,   FALSE, 10),
+    ('early_bird',      'Madrugador',       'Recibe 5 desayunos.',                               'bronze',   'sunrise',  'breakfast_orders',     5,   FALSE, 20),
+    ('explorer',        'Explorador',       'Pide en 3 restaurantes distintos.',                 'bronze',   'compass',  'distinct_restaurants', 3,   FALSE, 30),
+    ('steady',          'Constante',        'Pide 5 días hábiles seguidos.',                     'silver',   'flame',    'workday_streak',       5,   FALSE, 40),
+    ('varied_palate',   'Paladar variado',  'Prueba 5 proteínas distintas.',                     'silver',   'leaf',     'distinct_proteins',    5,   FALSE, 50),
+    ('loyal',           'Cliente fiel',     'Recibe 25 pedidos.',                                'silver',   'heart',    'delivered_orders',     25,  FALSE, 60),
+    ('unstoppable',     'Imparable',        'Pide 20 días hábiles seguidos.',                    'gold',     'bolt',     'workday_streak',       20,  FALSE, 70),
+    ('word_kept',       'Palabra cumplida', 'Recibe 30 pedidos seguidos sin cancelar ninguno.', 'gold',     'shield',   'no_cancel_streak',     30,  TRUE,  80),
+    ('centurion',       'Centenario',       'Recibe 100 pedidos.',                               'gold',     'medal',    'delivered_orders',     100, FALSE, 90),
+    ('platinum',        'Platino Ate',      'Consigue todos los demás trofeos.',                 'platinum', 'trophy',   'all_trophies',         1,   FALSE, 100)
+ON CONFLICT (code) DO UPDATE SET
+    name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    tier = EXCLUDED.tier,
+    icon = EXCLUDED.icon,
+    metric = EXCLUDED.metric,
+    threshold = EXCLUDED.threshold,
+    is_hidden = EXCLUDED.is_hidden,
+    sort_order = EXCLUDED.sort_order;

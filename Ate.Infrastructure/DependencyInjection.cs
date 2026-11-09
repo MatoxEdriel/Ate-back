@@ -31,6 +31,10 @@ public static class DependencyInjection
         services.AddSingleton<IEmailQueue>(sp => sp.GetRequiredService<EmailQueue>());
         services.AddHostedService<EmailDispatchWorker>();
 
+        services.AddSingleton<AchievementQueue>();
+        services.AddSingleton<IAchievementQueue>(sp => sp.GetRequiredService<AchievementQueue>());
+        services.AddHostedService<AchievementWorker>();
+
         services.AddOptions<PasswordRecoveryOptions>()
             .Bind(configuration.GetSection(PasswordRecoveryOptions.SectionName))
             .ValidateDataAnnotations()

@@ -24,4 +24,9 @@ public record UpdateMerchantRestaurantRequest(
     int ReadyMinutes,
     decimal? Latitude = null,
     decimal? Longitude = null,
-    IReadOnlyDictionary<string, string>? Cutoff = null);
+    IReadOnlyDictionary<string, string>? Cutoff = null,
+    // TEMPORAL: logo serializado como data URL base64 (png/webp/jpeg) hasta tener el servidor de imágenes.
+    // null = no cambia, "" = quita el logo, data URL = lo reemplaza.
+    string? Logo = null,
+    // Required only when name, phone, address, location or logo change (sensitive data of the venue).
+    string? CurrentPassword = null);

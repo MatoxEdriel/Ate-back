@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 using Ate.Application.Features.MerchantRestaurant.DTOs;
 using Ate.Application.Features.Restaurants;
 using FluentValidation;
@@ -7,6 +8,16 @@ namespace Ate.Application.Features.MerchantRestaurant.Validators;
 
 public class UpdateMerchantRestaurantRequestValidator : AbstractValidator<UpdateMerchantRestaurantRequest>
 {
+    /// <summary>
+    /// TEMPORAL: el logo llega serializado en base64 porque aún no hay servidor de imágenes.
+    /// El front lo reduce a 256 px; ~300 mil caracteres (~220 KB) sobra para eso.
+    /// </summary>
+    public const int MaxLogoLength = 300_000;
+
+    private static readonly Regex LogoDataUrl = new(
+        @"^data:image/(png|webp|jpeg);base64,[A-Za-z0-9+/]+={0,2}$",
+        RegexOptions.Compiled);
+
     public UpdateMerchantRestaurantRequestValidator()
     {
         RuleFor(x => x.Name)
@@ -57,6 +68,13 @@ public class UpdateMerchantRestaurantRequestValidator : AbstractValidator<Update
             .WithMessage("Las horas límite solo pueden ser de desayuno, almuerzo o merienda.")
             .Must(cutoff => cutoff == null || cutoff.Values.All(BeValidTime))
             .WithMessage("Cada hora límite debe tener el formato HH:mm (por ejemplo 11:30).");
+
+        RuleFor(x => x.Logo)
+            .MaximumLength(MaxLogoLength)
+            .WithMessage("El logo es demasiado pesado. Usa una imagen más pequeña.")
+            .Must(logo => LogoDataUrl.IsMatch(logo!))
+            .WithMessage("El logo debe ser una imagen PNG, WebP o JPG.")
+            .When(x => !string.IsNullOrEmpty(x.Logo));
 
         RuleFor(x => x.ReadyMinutes)
             .InclusiveBetween(5, 120)

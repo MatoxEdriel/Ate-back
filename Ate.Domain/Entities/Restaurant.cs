@@ -15,6 +15,10 @@ public class Restaurant : BaseAuditableEntity
     public decimal? Latitude { get; set; }
     public decimal? Longitude { get; set; }
     public string BrandColor { get; set; } = "#B5532E";
+    /// <summary>
+    /// TEMPORAL: mientras no exista un servidor de imágenes, el logo se guarda serializado como
+    /// data URL base64 (data:image/png;base64,...). Próximamente será la URL pública del archivo.
+    /// </summary>
     public string? LogoUrl { get; set; }
     public string? Icon { get; set; }
     public int ReadyMinutes { get; set; } = 15;

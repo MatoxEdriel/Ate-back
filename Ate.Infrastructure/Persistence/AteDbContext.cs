@@ -29,6 +29,8 @@ public class AteDbContext : DbContext, IApplicationDbContext
     public DbSet<Restaurant> Restaurants => Set<Restaurant>();
     public DbSet<RestaurantDish> RestaurantDishes => Set<RestaurantDish>();
     public DbSet<CompanyRestaurantAgreement> CompanyRestaurantAgreements => Set<CompanyRestaurantAgreement>();
+    public DbSet<AchievementDefinition> AchievementDefinitions => Set<AchievementDefinition>();
+    public DbSet<UserAchievement> UserAchievements => Set<UserAchievement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

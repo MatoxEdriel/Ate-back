@@ -41,7 +41,7 @@ public class MerchantRestaurantController : ControllerBase
 
     [HttpPut]
     [EndpointSummary("Update the profile of the merchant's restaurant")]
-    [EndpointDescription("Name, cuisine, address, phone, brand color, preparation time, map location and order cutoff times. cutoff is optional and only the meals present (desayuno, almuerzo, merienda, as HH:mm) are changed. The new name and cutoff show up for employees right away.")]
+    [EndpointDescription("Name, cuisine, address, phone, brand color, preparation time, map location, logo and order cutoff times. logo is temporary: a base64 data URL (png/webp/jpeg, up to 300k chars) until the image server exists; null keeps it and an empty string removes it. Changing name, phone, address, location or logo requires currentPassword (400 MerchantRestaurant.PasswordRequired / InvalidPassword otherwise). cutoff is optional and only the meals present (desayuno, almuerzo, merienda, as HH:mm) are changed. The new name and cutoff show up for employees right away.")]
     [ProducesResponseType(typeof(ApiResponse<MerchantRestaurantDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<MerchantRestaurantDto>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<MerchantRestaurantDto>), StatusCodes.Status403Forbidden)]
