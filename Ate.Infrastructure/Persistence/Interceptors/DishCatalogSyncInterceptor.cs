@@ -81,7 +81,6 @@ public class DishCatalogSyncInterceptor : SaveChangesInterceptor
             }
         }
 
-        // El nombre, cocina o estado del restaurante está copiado en cada plato.
         foreach (var entry in context.ChangeTracker.Entries<Restaurant>())
         {
             if (entry.State is EntityState.Modified or EntityState.Deleted)

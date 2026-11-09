@@ -35,7 +35,6 @@ public sealed class EmailDispatchWorker : BackgroundService
             }
             catch (Exception ex)
             {
-                // Never log the email body: it may contain one-time codes.
                 _logger.LogError(ex, "A queued email could not be sent.");
             }
         }

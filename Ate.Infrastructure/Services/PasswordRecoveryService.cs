@@ -55,7 +55,6 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
         _emailQueue = emailQueue;
         _dateTimeProvider = dateTimeProvider;
         _options = options.Value;
-        // Server-side key: a leaked table alone is not enough to brute-force the 5-digit codes offline.
         _hashKey = SHA256.HashData(Encoding.UTF8.GetBytes($"ate:password-recovery:{jwtOptions.Value.SecretKey}"));
         _requestValidator = requestValidator;
         _verifyValidator = verifyValidator;
@@ -74,7 +73,6 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
         var user = await FindActiveUserAsync(request.Email, cancellationToken);
         if (user == null)
         {
-            // Same answer as for an existing account: the endpoint must not reveal which emails are registered.
             return Result.Success();
         }
 
@@ -101,7 +99,6 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
             CodeExpiresAt = now.AddMinutes(_options.CodeLifetimeMinutes),
             CreatedAt = now
         });
-        // A parallel verify touched an older recovery: do not send a code that was not stored.
         if (!await TrySaveAsync(cancellationToken))
         {
             return Result.Success();
@@ -116,7 +113,6 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
             _options.CodeLifetimeMinutes,
             requestedAt);
 
-        // Queued, not awaited: the response time does not reveal whether the account exists.
         if (!_emailQueue.TryEnqueueTemplate(user.Email!, EmailSubject, EmailTemplateType.PasswordResetCode, model))
         {
             _logger.LogError("Password recovery email for user {UserId} was dropped: email queue is full.", user.Id);
@@ -151,7 +147,6 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
 
         var now = _dateTimeProvider.UtcNow;
 
-        // Time token: the code is only accepted inside its validity window.
         if (recovery.IsCodeExpired(now))
         {
             recovery.InvalidatedAt = now;
@@ -182,7 +177,6 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
         recovery.ResetTokenHash = Hash(resetToken);
         recovery.ResetTokenExpiresAt = now.AddMinutes(_options.ResetTokenLifetimeMinutes);
 
-        // Another request used this attempt in parallel: do not issue a token for it.
         if (!await TrySaveAsync(cancellationToken))
         {
             return Result.Failure<PasswordResetTokenDto>(PasswordRecoveryErrors.InvalidCode);
@@ -211,7 +205,6 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
 
         var now = _dateTimeProvider.UtcNow;
 
-        // Time token: the reset token is single-use and only valid inside its window.
         if (recovery.IsResetTokenExpired(now))
         {
             recovery.InvalidatedAt = now;
@@ -226,7 +219,6 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
 
         await InvalidateOpenRecoveriesAsync(user.Id, now, cancellationToken, exceptId: recovery.Id);
 
-        // A changed password signs out every existing session.
         var activeTokens = await _context.RefreshTokens
             .Where(t => t.UserId == user.Id && !t.IsRevoked)
             .ToListAsync(cancellationToken);
@@ -235,7 +227,6 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
             token.IsRevoked = true;
         }
 
-        // The same token submitted twice in parallel: only one of them changes the password.
         if (!await TrySaveAsync(cancellationToken))
         {
             return Result.Failure(PasswordRecoveryErrors.InvalidResetToken);

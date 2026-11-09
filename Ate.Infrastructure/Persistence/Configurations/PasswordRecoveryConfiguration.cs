@@ -19,8 +19,6 @@ public class PasswordRecoveryConfiguration : IEntityTypeConfiguration<PasswordRe
         builder.Property(r => r.ResetTokenHash)
             .HasMaxLength(128);
 
-        // Concurrency tokens: parallel guesses cannot reuse the same attempt, and a reset token
-        // cannot be consumed twice (UPDATE ... WHERE attempts = @old / used_at IS NULL).
         builder.Property(r => r.Attempts)
             .IsRequired()
             .HasDefaultValue(0)

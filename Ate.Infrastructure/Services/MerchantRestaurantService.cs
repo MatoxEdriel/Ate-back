@@ -60,7 +60,6 @@ public class MerchantRestaurantService : IMerchantRestaurantService, IScopedDepe
         restaurant.Latitude = request.Latitude.HasValue ? Math.Round(request.Latitude.Value, 6) : null;
         restaurant.Longitude = request.Longitude.HasValue ? Math.Round(request.Longitude.Value, 6) : null;
 
-        // The DishCatalogSyncInterceptor copies the new name to MongoDB (dish_catalog) on save.
         await _context.SaveChangesAsync(cancellationToken);
 
         return Result.Success(ToDto(restaurant));

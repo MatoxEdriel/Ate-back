@@ -115,7 +115,6 @@ public class MerchantOrderService : IMerchantOrderService, IScopedDependency
             Note = StatusNotes[target]
         };
 
-        // The status filter makes the transition atomic: two devices cannot move the same order twice.
         var filter = Builders<EmployeeOrder>.Filter.And(
             Builders<EmployeeOrder>.Filter.Eq(o => o.Id, orderId),
             Builders<EmployeeOrder>.Filter.Eq(o => o.RestaurantId, restaurantId.Value),
@@ -126,7 +125,6 @@ public class MerchantOrderService : IMerchantOrderService, IScopedDependency
             .Set(o => o.UpdatedAt, now)
             .Push(o => o.StatusHistory, change);
 
-        // A closed order (delivered or cancelled) frees the slot: the employee can order that meal again.
         if (target is EmployeeOrderStatus.Delivered or EmployeeOrderStatus.Cancelled)
         {
             update = update.Unset(o => o.ActiveSlot);

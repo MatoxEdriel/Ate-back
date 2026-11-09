@@ -46,7 +46,6 @@ public static class MongoDbInitializer
                 })
         ], cancellationToken);
 
-        // Closed orders must not hold the "one active order per meal" slot (older data kept it on Delivered).
         await orders.UpdateManyAsync(
             Builders<EmployeeOrder>.Filter.And(
                 Builders<EmployeeOrder>.Filter.Exists(o => o.ActiveSlot),
