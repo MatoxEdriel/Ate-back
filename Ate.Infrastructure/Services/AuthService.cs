@@ -90,6 +90,11 @@ public class AuthService : IAuthService, IScopedDependency
             return Result.Failure<LoginResponse>(AuthErrors.UserInactive);
         }
 
+        if (user.Company is { IsActive: false })
+        {
+            return Result.Failure<LoginResponse>(AuthErrors.CompanyInactive);
+        }
+
         var roles = user.UserRoles
             .Where(ur => ur.Role != null && !string.IsNullOrWhiteSpace(ur.Role.Name))
             .Select(ur => ur.Role.Name)
@@ -159,6 +164,11 @@ public class AuthService : IAuthService, IScopedDependency
         if (!user.IsActive)
         {
             return Result.Failure<LoginResponse>(AuthErrors.UserInactive);
+        }
+
+        if (user.Company is { IsActive: false })
+        {
+            return Result.Failure<LoginResponse>(AuthErrors.CompanyInactive);
         }
 
         if (user.MustChangePassword)

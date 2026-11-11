@@ -11,6 +11,8 @@ public class Company : BaseAuditableEntity
     public string? Phone { get; set; }
     public string? Address { get; set; }
     public string? LogoUrl { get; set; }
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
     public bool IsActive { get; set; } = true;
 
     public ICollection<Employee> Employees { get; set; } = new List<Employee>();

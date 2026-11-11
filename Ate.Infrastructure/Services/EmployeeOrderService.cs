@@ -56,7 +56,7 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
             .AsNoTracking()
             .Include(e => e.Person)
             .Include(e => e.Company)
-            .FirstOrDefaultAsync(e => e.Person.UserId == userId && e.IsActive, cancellationToken);
+            .FirstOrDefaultAsync(e => e.Person.UserId == userId && e.IsActive && e.Company.IsActive, cancellationToken);
 
         if (employee == null)
         {

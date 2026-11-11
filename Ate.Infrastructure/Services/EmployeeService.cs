@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Common.Models.Emails;
 using Ate.Application.Features.Employees.DTOs;
@@ -16,12 +15,6 @@ namespace Ate.Infrastructure.Services;
 
 public class EmployeeService : IEmployeeService, IScopedDependency
 {
-    private const int TemporaryPasswordLength = 12;
-    private const string UpperChars = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-    private const string LowerChars = "abcdefghijkmnpqrstuvwxyz";
-    private const string DigitChars = "23456789";
-    private const string SymbolChars = "*#$%&@!";
-
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IValidator<CreateEmployeeRequest> _createValidator;
@@ -104,7 +97,7 @@ public class EmployeeService : IEmployeeService, IScopedDependency
             .Select(r => r.Id)
             .FirstAsync(cancellationToken);
 
-        var temporaryPassword = GenerateTemporaryPassword();
+        var temporaryPassword = TemporaryPasswordGenerator.Generate();
 
         var user = new User
         {
@@ -218,26 +211,5 @@ public class EmployeeService : IEmployeeService, IScopedDependency
             employee.IsIntern,
             employee.IsActive,
             employee.CreatedAt);
-    }
-
-    private static string GenerateTemporaryPassword()
-    {
-        var allChars = UpperChars + LowerChars + DigitChars + SymbolChars;
-        var chars = new List<char>
-        {
-            UpperChars[RandomNumberGenerator.GetInt32(UpperChars.Length)],
-            LowerChars[RandomNumberGenerator.GetInt32(LowerChars.Length)],
-            DigitChars[RandomNumberGenerator.GetInt32(DigitChars.Length)],
-            SymbolChars[RandomNumberGenerator.GetInt32(SymbolChars.Length)]
-        };
-
-        while (chars.Count < TemporaryPasswordLength)
-        {
-            chars.Add(allChars[RandomNumberGenerator.GetInt32(allChars.Length)]);
-        }
-
-        var shuffled = chars.ToArray();
-        RandomNumberGenerator.Shuffle(shuffled.AsSpan());
-        return new string(shuffled);
     }
 }

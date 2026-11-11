@@ -13,6 +13,9 @@ public static class AuthErrors
     public static readonly Error UserInactive =
         Error.Forbidden("Auth.UserInactive", "Tu cuenta está desactivada o bloqueada. Comunícate con un administrador.");
 
+    public static readonly Error CompanyInactive =
+        Error.Forbidden("Auth.CompanyInactive", "Tu empresa está desactivada en Ate. Comunícate con el administrador de la plataforma.");
+
     public static Error TooManyLoginAttempts(TimeSpan retryAfter)
     {
         var minutes = Math.Max(1, (int)Math.Ceiling(retryAfter.TotalMinutes));

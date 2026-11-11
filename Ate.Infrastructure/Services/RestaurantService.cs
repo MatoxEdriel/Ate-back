@@ -24,7 +24,7 @@ public class RestaurantService : IRestaurantService, IScopedDependency
     {
         var companyId = await _context.Employees
             .AsNoTracking()
-            .Where(e => e.Person.UserId == userId && e.IsActive)
+            .Where(e => e.Person.UserId == userId && e.IsActive && e.Company.IsActive)
             .Select(e => (Guid?)e.CompanyId)
             .FirstOrDefaultAsync(cancellationToken);
 

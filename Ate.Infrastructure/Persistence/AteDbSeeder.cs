@@ -46,9 +46,15 @@ public static partial class AteDbSeeder
         var company = await context.Companies.FirstOrDefaultAsync(c => c.TaxId == companyTaxId);
         if (company != null)
         {
-            if (string.IsNullOrWhiteSpace(company.LogoUrl))
+            if (string.IsNullOrWhiteSpace(company.LogoUrl) || !company.Latitude.HasValue)
             {
-                company.LogoUrl = companyLogoUrl;
+                if (string.IsNullOrWhiteSpace(company.LogoUrl))
+                {
+                    company.LogoUrl = companyLogoUrl;
+                }
+
+                company.Latitude ??= -2.189000m;
+                company.Longitude ??= -79.889000m;
                 await context.SaveChangesAsync();
             }
 
@@ -65,6 +71,8 @@ public static partial class AteDbSeeder
             Phone = "042000000",
             Address = "Av. Principal 123 y Calle B",
             LogoUrl = companyLogoUrl,
+            Latitude = -2.189000m,
+            Longitude = -79.889000m,
             IsActive = true
         };
 

@@ -99,6 +99,19 @@ ON companies(tax_id)
 WHERE is_deleted = FALSE;
 
 ALTER TABLE companies ADD COLUMN IF NOT EXISTS logo_url VARCHAR(500) NULL;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS latitude NUMERIC(9,6) NULL;
+ALTER TABLE companies ADD COLUMN IF NOT EXISTS longitude NUMERIC(9,6) NULL;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_companies_location') THEN
+        ALTER TABLE companies
+            ADD CONSTRAINT ck_companies_location CHECK (
+                (latitude IS NULL AND longitude IS NULL)
+                OR (latitude BETWEEN -90 AND 90 AND longitude BETWEEN -180 AND 180)
+            );
+    END IF;
+END $$;
 
 -- 5.1 USERS -> COMPANIES (Company administrators belong to one company)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id UUID NULL;

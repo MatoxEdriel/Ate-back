@@ -40,6 +40,12 @@ public class CompanyConfiguration : IEntityTypeConfiguration<Company>
         builder.Property(c => c.LogoUrl)
             .HasMaxLength(500);
 
+        builder.Property(c => c.Latitude)
+            .HasColumnType("numeric(9,6)");
+
+        builder.Property(c => c.Longitude)
+            .HasColumnType("numeric(9,6)");
+
         builder.Property(c => c.IsActive)
             .IsRequired()
             .HasDefaultValue(true);
