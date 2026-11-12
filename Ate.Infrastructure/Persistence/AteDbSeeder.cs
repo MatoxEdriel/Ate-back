@@ -30,11 +30,12 @@ public static partial class AteDbSeeder
     {
         await SeedRolesAsync(context);
         var company = await SeedDefaultCompanyAsync(context);
+        var departments = await SeedDepartmentsAsync(context, company);
         await SeedCompanyAdminAsync(context, passwordHasher, company);
         await SeedSuperAdminAsync(context, passwordHasher);
-        await SeedDefaultEmployeeAsync(context, passwordHasher, company);
+        await SeedDefaultEmployeeAsync(context, passwordHasher, company, departments);
         await SeedMerchantAsync(context, passwordHasher);
-        await SeedSampleEmployeesAsync(context, passwordHasher, company);
+        await SeedSampleEmployeesAsync(context, passwordHasher, company, departments);
         await SeedRestaurantsAsync(context, company);
     }
 
@@ -233,7 +234,7 @@ public static partial class AteDbSeeder
         await context.SaveChangesAsync();
     }
 
-    private static async Task SeedDefaultEmployeeAsync(AteDbContext context, IPasswordHasher passwordHasher, Company company)
+    private static async Task SeedDefaultEmployeeAsync(AteDbContext context, IPasswordHasher passwordHasher, Company company, IReadOnlyDictionary<string, Guid> departments)
     {
         const string employeeEmail = "empleado@ate.com";
         const string employeeDocumentNumber = "0943676156";
@@ -290,7 +291,7 @@ public static partial class AteDbSeeder
             CompanyId = company.Id,
             PersonId = person.Id,
             EmployeeCode = "EMP-001",
-            Department = "Tecnología",
+            DepartmentId = departments.GetValueOrDefault("Tecnología"),
             MonthlyAllowance = 120m,
             IsIntern = false,
             IsActive = true
@@ -302,6 +303,31 @@ public static partial class AteDbSeeder
         context.Employees.Add(employee);
 
         await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// Departamentos de la empresa demo. Idempotente: solo crea los que falten por nombre.
+    /// </summary>
+    private static async Task<IReadOnlyDictionary<string, Guid>> SeedDepartmentsAsync(AteDbContext context, Company company)
+    {
+        var existing = await context.Departments
+            .Where(d => d.CompanyId == company.Id)
+            .ToDictionaryAsync(d => d.Name, d => d.Id);
+
+        var missing = DefaultDepartments.Names.Where(name => !existing.ContainsKey(name)).ToList();
+        foreach (var name in missing)
+        {
+            var department = new Department { CompanyId = company.Id, Name = name };
+            context.Departments.Add(department);
+            existing[name] = department.Id;
+        }
+
+        if (missing.Count > 0)
+        {
+            await context.SaveChangesAsync();
+        }
+
+        return existing;
     }
 
     private static async Task SeedMerchantAsync(AteDbContext context, IPasswordHasher passwordHasher)
@@ -362,7 +388,7 @@ public static partial class AteDbSeeder
         await context.SaveChangesAsync();
     }
 
-    private static async Task SeedSampleEmployeesAsync(AteDbContext context, IPasswordHasher passwordHasher, Company company)
+    private static async Task SeedSampleEmployeesAsync(AteDbContext context, IPasswordHasher passwordHasher, Company company, IReadOnlyDictionary<string, Guid> departments)
     {
         var documentNumbers = SampleEmployees.Select(s => s.DocumentNumber).ToList();
         var existingDocuments = await context.Persons
@@ -434,7 +460,7 @@ public static partial class AteDbSeeder
                 CompanyId = company.Id,
                 PersonId = person.Id,
                 EmployeeCode = sample.Code,
-                Department = sample.Department,
+                DepartmentId = departments.GetValueOrDefault(sample.Department),
                 MonthlyAllowance = sample.Allowance,
                 IsIntern = sample.IsIntern,
                 IsActive = sample.IsActive

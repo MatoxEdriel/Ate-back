@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Mail;
+using System.Net.Mime;
+using System.Text.RegularExpressions;
 using Ate.Application.Common.Interfaces;
 using Ate.Domain.Enums;
 using Microsoft.Extensions.Logging;
@@ -12,6 +14,7 @@ namespace Ate.Infrastructure.Services;
 public class EmailService : IEmailService, IScopedDependency
 {
     private static readonly ConcurrentDictionary<string, string> TemplateCache = new();
+    private static readonly Regex InlineImageReference = new(@"cid:([A-Za-z0-9._-]+)", RegexOptions.Compiled);
     private readonly SmtpOptions _options;
     private readonly ILogger<EmailService> _logger;
 
@@ -43,6 +46,11 @@ public class EmailService : IEmailService, IScopedDependency
             IsBodyHtml = isHtml
         };
         message.To.Add(toEmail);
+
+        if (isHtml)
+        {
+            AttachInlineImages(message, body);
+        }
 
         if (ccEmails != null)
         {
@@ -103,6 +111,53 @@ public class EmailService : IEmailService, IScopedDependency
 
         return await layoutTemplate.RenderAsync(layoutModel);
     }
+
+    /// <summary>
+    /// Embeds the images a template references as <c>cid:file-name.jpg</c> (files in Templates/Emails/Images),
+    /// so they show up in every mail client without depending on a public URL.
+    /// </summary>
+    private void AttachInlineImages(MailMessage message, string html)
+    {
+        var contentIds = InlineImageReference.Matches(html)
+            .Select(m => m.Groups[1].Value)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (contentIds.Count == 0)
+        {
+            return;
+        }
+
+        var assembly = typeof(EmailService).Assembly;
+        var resourceNames = assembly.GetManifestResourceNames();
+        var htmlView = AlternateView.CreateAlternateViewFromString(html, null, MediaTypeNames.Text.Html);
+
+        foreach (var contentId in contentIds)
+        {
+            var resourceName = resourceNames.FirstOrDefault(n => n.EndsWith($".Images.{contentId}", StringComparison.OrdinalIgnoreCase));
+            var stream = resourceName == null ? null : assembly.GetManifestResourceStream(resourceName);
+            if (stream == null)
+            {
+                _logger.LogWarning("Inline email image {ContentId} was not found.", contentId);
+                continue;
+            }
+
+            htmlView.LinkedResources.Add(new LinkedResource(stream, ImageMediaType(contentId))
+            {
+                ContentId = contentId,
+                TransferEncoding = TransferEncoding.Base64
+            });
+        }
+
+        message.AlternateViews.Add(htmlView);
+    }
+
+    private static string ImageMediaType(string fileName) =>
+        Path.GetExtension(fileName).ToLowerInvariant() switch
+        {
+            ".png" => "image/png",
+            ".gif" => "image/gif",
+            _ => MediaTypeNames.Image.Jpeg
+        };
 
     private static async Task<string> GetTemplateSourceAsync(string templateFileName)
     {

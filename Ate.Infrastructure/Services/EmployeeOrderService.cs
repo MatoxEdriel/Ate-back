@@ -56,6 +56,7 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
             .AsNoTracking()
             .Include(e => e.Person)
             .Include(e => e.Company)
+            .Include(e => e.Department)
             .FirstOrDefaultAsync(e => e.Person.UserId == userId && e.IsActive && e.Company.IsActive, cancellationToken);
 
         if (employee == null)
@@ -133,7 +134,7 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
             EmployeeCode = employee.EmployeeCode ?? string.Empty,
             EmployeeName = $"{employee.Person.FirstName} {employee.Person.LastName}".Trim(),
             EmployeeDocument = employee.Person.DocumentNumber,
-            Department = employee.Department,
+            Department = employee.Department?.Name,
             RestaurantId = restaurant.Id,
             RestaurantName = restaurant.Name,
             MealType = mealType,

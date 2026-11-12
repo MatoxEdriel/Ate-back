@@ -186,6 +186,14 @@ SET company_id = (
 )
 WHERE email = 'admin@ate.com' AND company_id IS NULL;
 
+-- 6.2 DEPARTMENTS OF THE SAMPLE COMPANY
+INSERT INTO departments (company_id, name)
+SELECT c.id, v.name
+FROM companies c
+CROSS JOIN (VALUES ('Administración'), ('Finanzas'), ('Operaciones'), ('Talento Humano'), ('Tecnología'), ('Ventas')) AS v(name)
+WHERE c.tax_id = '0990000001001' AND c.is_deleted = FALSE
+ON CONFLICT DO NOTHING;
+
 -- 7. DEFAULT EMPLOYEE ACCOUNT (For collaborator meal dashboard)
 -- Default Credentials:
 --   Identifier / Email: empleado@ate.com
@@ -256,7 +264,7 @@ INSERT INTO employees (
     company_id,
     person_id,
     employee_code,
-    department,
+    department_id,
     monthly_allowance,
     is_intern,
     qr_code_token,
@@ -269,7 +277,11 @@ VALUES (
     '01928000-0000-7000-8000-000000000020',
     '01928000-0000-7000-8000-000000000031',
     'EMP-001',
-    'Tecnología',
+    (
+        SELECT d.id FROM departments d
+        JOIN companies c ON c.id = d.company_id
+        WHERE c.tax_id = '0990000001001' AND d.name = 'Tecnología' AND d.is_deleted = FALSE
+    ),
     120.00,
     FALSE,
     '01928000000070008000000000000032',
@@ -404,8 +416,8 @@ VALUES
     ('01928000-0000-7000-8000-000000000145', 3, CURRENT_TIMESTAMP)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO employees (id, company_id, person_id, employee_code, department, monthly_allowance, is_intern, qr_code_token, is_active, created_at, is_deleted)
-SELECT v.id::uuid, c.id, p.id, v.code, v.department, v.allowance, v.is_intern, replace(v.id, '-', ''), v.is_active, CURRENT_TIMESTAMP - (v.days_ago || ' days')::interval, FALSE
+INSERT INTO employees (id, company_id, person_id, employee_code, department_id, monthly_allowance, is_intern, qr_code_token, is_active, created_at, is_deleted)
+SELECT v.id::uuid, c.id, p.id, v.code, d.id, v.allowance, v.is_intern, replace(v.id, '-', ''), v.is_active, CURRENT_TIMESTAMP - (v.days_ago || ' days')::interval, FALSE
 FROM (VALUES
     ('01928000-0000-7000-8000-000000000108', '0923456781', 'EMP-002', 'Talento Humano', 150.00, FALSE, TRUE, 60),
     ('01928000-0000-7000-8000-000000000111', '0934567812', 'EMP-003', 'Tecnología', 120.00, FALSE, TRUE, 56),
@@ -424,6 +436,7 @@ FROM (VALUES
 ) AS v(id, document_number, code, department, allowance, is_intern, is_active, days_ago)
 JOIN persons p ON p.document_number = v.document_number AND p.document_type = 'NationalId' AND p.is_deleted = FALSE
 JOIN companies c ON c.tax_id = '0990000001001' AND c.is_deleted = FALSE
+LEFT JOIN departments d ON d.company_id = c.id AND d.name = v.department AND d.is_deleted = FALSE
 ON CONFLICT DO NOTHING;
 
 UPDATE employees

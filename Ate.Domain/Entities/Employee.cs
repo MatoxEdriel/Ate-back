@@ -9,7 +9,8 @@ public class Employee : BaseAuditableEntity
     public Guid PersonId { get; set; }
     public Person Person { get; set; } = null!;
     public string? EmployeeCode { get; set; }
-    public string? Department { get; set; }
+    public Guid? DepartmentId { get; set; }
+    public Department? Department { get; set; }
     public decimal MonthlyAllowance { get; set; }
     public bool IsIntern { get; set; }
     public string QrCodeToken { get; set; } = Guid.CreateVersion7().ToString("N");

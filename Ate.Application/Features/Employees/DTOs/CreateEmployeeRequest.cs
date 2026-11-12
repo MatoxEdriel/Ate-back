@@ -6,5 +6,5 @@ public record CreateEmployeeRequest(
     string LastName,
     string Email,
     string EmployeeCode,
-    string Department,
+    Guid DepartmentId,
     bool IsIntern = false);

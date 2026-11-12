@@ -47,10 +47,8 @@ public class CreateEmployeeRequestValidator : AbstractValidator<CreateEmployeeRe
             .MaximumLength(50)
             .WithMessage("El código no puede superar 50 caracteres.");
 
-        RuleFor(x => x.Department)
+        RuleFor(x => x.DepartmentId)
             .NotEmpty()
-            .WithMessage("Selecciona el departamento.")
-            .MaximumLength(100)
-            .WithMessage("El departamento no puede superar 100 caracteres.");
+            .WithMessage("Selecciona el departamento.");
     }
 }

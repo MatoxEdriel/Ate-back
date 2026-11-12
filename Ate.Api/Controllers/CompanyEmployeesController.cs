@@ -44,7 +44,7 @@ public class CompanyEmployeesController : ControllerBase
 
     [HttpPost]
     [EndpointSummary("Register a new employee in the administrator's company")]
-    [EndpointDescription("Creates the user account, person profile, Employee role and employee record in a single transaction. Returns a one-time temporary password.")]
+    [EndpointDescription("Creates the user account, person profile, Employee role and employee record in a single transaction, and emails the temporary password only to the employee (it is never returned in the response).")]
     [ProducesResponseType(typeof(ApiResponse<CreateEmployeeResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<CreateEmployeeResponse>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<CreateEmployeeResponse>), StatusCodes.Status409Conflict)]
@@ -58,6 +58,23 @@ public class CompanyEmployeesController : ControllerBase
 
         var result = await _employeeService.CreateAsync(userId.Value, request, cancellationToken);
         return result.ToActionResult(this, "Employee created successfully.");
+    }
+
+    [HttpPatch("{employeeId:guid}/department")]
+    [EndpointSummary("Move an employee to another department of the company")]
+    [EndpointDescription("Send departmentId null to leave the employee without department.")]
+    [ProducesResponseType(typeof(ApiResponse<EmployeeDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<EmployeeDto>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateDepartment(Guid employeeId, [FromBody] UpdateEmployeeDepartmentRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return ResultExtensions.ToErrorActionResult<EmployeeDto>(AuthErrors.InvalidToken, this);
+        }
+
+        var result = await _employeeService.UpdateDepartmentAsync(userId.Value, employeeId, request, cancellationToken);
+        return result.ToActionResult(this, "Employee department updated successfully.");
     }
 
     [HttpPatch("{employeeId:guid}/status")]

@@ -31,6 +31,18 @@ public class AdminRestaurantsController : ControllerBase
         return result.ToActionResult(this, "Restaurants retrieved successfully.");
     }
 
+    [HttpPost]
+    [EndpointSummary("Create a restaurant together with its merchant account")]
+    [EndpointDescription("Creates the restaurant, the Merchant account, its person profile and role in a single transaction, and emails the temporary password only to the new account (it is never returned in the response). The merchant completes the logo, menu and cutoff times from their panel.")]
+    [ProducesResponseType(typeof(ApiResponse<CreateRestaurantResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<CreateRestaurantResponse>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<CreateRestaurantResponse>), StatusCodes.Status409Conflict)]
+    public async Task<IActionResult> CreateRestaurant([FromBody] CreateRestaurantRequest request, CancellationToken cancellationToken)
+    {
+        var result = await _restaurantService.CreateAsync(request, cancellationToken);
+        return result.ToActionResult(this, "Restaurant created successfully.");
+    }
+
     [HttpPatch("{restaurantId:guid}/status")]
     [EndpointSummary("Activate or deactivate a restaurant")]
     [EndpointDescription("A deactivated restaurant stops appearing for every company and cannot receive orders. Agreements are kept.")]

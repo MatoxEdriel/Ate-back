@@ -15,8 +15,10 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
         builder.Property(e => e.EmployeeCode)
             .HasMaxLength(50);
 
-        builder.Property(e => e.Department)
-            .HasMaxLength(100);
+        builder.HasOne(e => e.Department)
+            .WithMany(d => d.Employees)
+            .HasForeignKey(e => e.DepartmentId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         builder.Property(e => e.MonthlyAllowance)
             .HasPrecision(12, 2)

@@ -6,6 +6,16 @@ public record WelcomeUserEmailModel(
     string TemporaryPassword,
     string LoginUrl);
 
+/// <summary>Bienvenida del restaurante aliado a la plataforma, con su acceso al portal del comercio.</summary>
+/// <param name="DocumentNumber">Cédula del responsable: es su usuario para ingresar.</param>
+public record WelcomeMerchantEmailModel(
+    string FullName,
+    string RestaurantName,
+    string DocumentNumber,
+    string Email,
+    string TemporaryPassword,
+    string PortalUrl);
+
 public record PasswordResetEmailModel(
     string FullName,
     string ResetUrl,

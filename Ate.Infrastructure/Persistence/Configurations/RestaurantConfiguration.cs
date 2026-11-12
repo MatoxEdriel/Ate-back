@@ -20,6 +20,13 @@ public class RestaurantConfiguration : IEntityTypeConfiguration<Restaurant>
             .IsUnique()
             .HasFilter("is_deleted = false");
 
+        builder.Property(r => r.TaxId)
+            .HasMaxLength(13);
+
+        builder.HasIndex(r => r.TaxId)
+            .IsUnique()
+            .HasFilter("tax_id IS NOT NULL AND is_deleted = false");
+
         builder.Property(r => r.Name)
             .HasMaxLength(150)
             .IsRequired();

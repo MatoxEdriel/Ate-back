@@ -7,6 +7,7 @@ public record EmployeeDto(
     string LastName,
     string Email,
     string EmployeeCode,
+    Guid? DepartmentId,
     string Department,
     bool IsIntern,
     bool IsActive,

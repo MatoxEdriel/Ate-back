@@ -51,6 +51,7 @@ public class EmployeeService : IEmployeeService, IScopedDependency
             .Where(e => e.CompanyId == companyId.Value)
             .Include(e => e.Person)
                 .ThenInclude(p => p.User)
+            .Include(e => e.Department)
             .OrderByDescending(e => e.CreatedAt)
             .ToListAsync(cancellationToken);
 
@@ -92,6 +93,13 @@ public class EmployeeService : IEmployeeService, IScopedDependency
             return Result.Failure<CreateEmployeeResponse>(EmployeeErrors.CodeAlreadyExists);
         }
 
+        var department = await _context.Departments
+            .FirstOrDefaultAsync(d => d.Id == request.DepartmentId && d.CompanyId == companyId.Value, cancellationToken);
+        if (department == null)
+        {
+            return Result.Failure<CreateEmployeeResponse>(DepartmentErrors.NotFound);
+        }
+
         var employeeRoleId = await _context.Roles
             .Where(r => r.Name == RoleConstants.Employee)
             .Select(r => r.Id)
@@ -124,7 +132,8 @@ public class EmployeeService : IEmployeeService, IScopedDependency
             PersonId = person.Id,
             Person = person,
             EmployeeCode = employeeCode,
-            Department = request.Department.Trim(),
+            DepartmentId = department.Id,
+            Department = department,
             MonthlyAllowance = 0m,
             IsIntern = request.IsIntern,
             IsActive = true
@@ -142,6 +151,7 @@ public class EmployeeService : IEmployeeService, IScopedDependency
 
         await _context.SaveChangesAsync(cancellationToken);
 
+        var welcomeEmailSent = false;
         try
         {
             var loginUrl = $"{_smtpOptions.ClientBaseUrl.TrimEnd('/')}/login";
@@ -156,13 +166,50 @@ public class EmployeeService : IEmployeeService, IScopedDependency
                     temporaryPassword,
                     loginUrl),
                 cancellationToken: cancellationToken);
+            welcomeEmailSent = true;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send welcome email to {Email}", user.Email);
         }
 
-        return Result.Success(new CreateEmployeeResponse(ToDto(employee), temporaryPassword));
+        return Result.Success(new CreateEmployeeResponse(ToDto(employee), welcomeEmailSent));
+    }
+
+    public async Task<Result<EmployeeDto>> UpdateDepartmentAsync(Guid adminUserId, Guid employeeId, UpdateEmployeeDepartmentRequest request, CancellationToken cancellationToken = default)
+    {
+        var companyId = await GetAdminCompanyIdAsync(adminUserId, cancellationToken);
+        if (!companyId.HasValue)
+        {
+            return Result.Failure<EmployeeDto>(EmployeeErrors.CompanyNotAssigned);
+        }
+
+        var employee = await _context.Employees
+            .Include(e => e.Person)
+                .ThenInclude(p => p.User)
+            .FirstOrDefaultAsync(e => e.Id == employeeId && e.CompanyId == companyId.Value, cancellationToken);
+
+        if (employee == null)
+        {
+            return Result.Failure<EmployeeDto>(EmployeeErrors.NotFound);
+        }
+
+        Department? department = null;
+        if (request.DepartmentId.HasValue)
+        {
+            department = await _context.Departments
+                .FirstOrDefaultAsync(d => d.Id == request.DepartmentId.Value && d.CompanyId == companyId.Value, cancellationToken);
+            if (department == null)
+            {
+                return Result.Failure<EmployeeDto>(DepartmentErrors.NotFound);
+            }
+        }
+
+        employee.DepartmentId = department?.Id;
+        employee.Department = department;
+        await _context.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(ToDto(employee));
     }
 
     public async Task<Result<EmployeeDto>> UpdateStatusAsync(Guid adminUserId, Guid employeeId, UpdateEmployeeStatusRequest request, CancellationToken cancellationToken = default)
@@ -176,6 +223,7 @@ public class EmployeeService : IEmployeeService, IScopedDependency
         var employee = await _context.Employees
             .Include(e => e.Person)
                 .ThenInclude(p => p.User)
+            .Include(e => e.Department)
             .FirstOrDefaultAsync(e => e.Id == employeeId && e.CompanyId == companyId.Value, cancellationToken);
 
         if (employee == null)
@@ -207,7 +255,8 @@ public class EmployeeService : IEmployeeService, IScopedDependency
             employee.Person.LastName,
             employee.Person.User?.Email ?? string.Empty,
             employee.EmployeeCode ?? string.Empty,
-            employee.Department ?? string.Empty,
+            employee.DepartmentId,
+            employee.Department?.Name ?? string.Empty,
             employee.IsIntern,
             employee.IsActive,
             employee.CreatedAt);

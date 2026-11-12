@@ -176,6 +176,10 @@ public class CompanyService : ICompanyService, IScopedDependency
         };
 
         _context.Companies.Add(company);
+        foreach (var departmentName in DefaultDepartments.Names)
+        {
+            _context.Departments.Add(new Department { CompanyId = company.Id, Name = departmentName });
+        }
         _context.Users.Add(user);
         _context.Persons.Add(person);
         _context.UserRoles.Add(new UserRole
@@ -185,11 +189,11 @@ public class CompanyService : ICompanyService, IScopedDependency
             AssignedAt = DateTimeOffset.UtcNow
         });
 
-        // A single SaveChanges: company, admin account and role are created atomically.
         await _context.SaveChangesAsync(cancellationToken);
 
         var adminFullName = $"{person.FirstName} {person.LastName}".Trim();
 
+        var welcomeEmailSent = false;
         try
         {
             var loginUrl = $"{_smtpOptions.ClientBaseUrl.TrimEnd('/')}/login";
@@ -199,6 +203,7 @@ public class CompanyService : ICompanyService, IScopedDependency
                 EmailTemplateType.WelcomeUser,
                 new WelcomeUserEmailModel(adminFullName, adminEmail, temporaryPassword, loginUrl),
                 cancellationToken: cancellationToken);
+            welcomeEmailSent = true;
         }
         catch (Exception ex)
         {
@@ -207,7 +212,7 @@ public class CompanyService : ICompanyService, IScopedDependency
 
         return Result.Success(new CreateCompanyResponse(
             ToDto(company, 0, adminFullName, adminEmail),
-            temporaryPassword));
+            welcomeEmailSent));
     }
 
     private static string? NullIfBlank(string? value) =>

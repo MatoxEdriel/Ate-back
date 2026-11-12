@@ -7,5 +7,6 @@ public interface IEmployeeService
 {
     Task<Result<IReadOnlyList<EmployeeDto>>> GetCompanyEmployeesAsync(Guid adminUserId, CancellationToken cancellationToken = default);
     Task<Result<CreateEmployeeResponse>> CreateAsync(Guid adminUserId, CreateEmployeeRequest request, CancellationToken cancellationToken = default);
+    Task<Result<EmployeeDto>> UpdateDepartmentAsync(Guid adminUserId, Guid employeeId, UpdateEmployeeDepartmentRequest request, CancellationToken cancellationToken = default);
     Task<Result<EmployeeDto>> UpdateStatusAsync(Guid adminUserId, Guid employeeId, UpdateEmployeeStatusRequest request, CancellationToken cancellationToken = default);
 }

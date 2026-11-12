@@ -33,7 +33,7 @@ public class AdminCompaniesController : ControllerBase
 
     [HttpPost]
     [EndpointSummary("Create a company together with its HR administrator")]
-    [EndpointDescription("Creates the company, the CompanyAdmin account, its person profile and role in a single transaction, and emails the welcome message. Returns a one-time temporary password.")]
+    [EndpointDescription("Creates the company, the CompanyAdmin account, its person profile and role in a single transaction, and emails the temporary password only to the new account (it is never returned in the response).")]
     [ProducesResponseType(typeof(ApiResponse<CreateCompanyResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<CreateCompanyResponse>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<CreateCompanyResponse>), StatusCodes.Status409Conflict)]

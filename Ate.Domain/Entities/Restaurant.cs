@@ -8,6 +8,8 @@ public class Restaurant : BaseAuditableEntity
     public Guid? MerchantUserId { get; set; }
     public User? MerchantUser { get; set; }
     public string Code { get; set; } = string.Empty;
+    /// <summary>RUC del restaurante. Opcional solo para los registrados antes de exigirlo.</summary>
+    public string? TaxId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string Cuisine { get; set; } = string.Empty;
     public string? Address { get; set; }

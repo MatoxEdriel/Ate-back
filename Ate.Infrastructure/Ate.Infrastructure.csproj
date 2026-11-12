@@ -20,6 +20,7 @@
   <ItemGroup>
     <EmbeddedResource Include="..\database\01_init_schema.sql" LogicalName="Ate.Database.InitSchema.sql" />
     <EmbeddedResource Include="Templates\Emails\*.html" />
+    <EmbeddedResource Include="Templates\Emails\Images\*" />
   </ItemGroup>
 
   <PropertyGroup>

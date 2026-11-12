@@ -20,7 +20,8 @@ public class CreateCompanyRequestValidator : AbstractValidator<CreateCompanyRequ
         RuleFor(x => x.TaxId)
             .Cascade(CascadeMode.Stop)
             .NotEmpty().WithMessage("Ingresa el RUC de la empresa.")
-            .Matches(@"^\d{13}$").WithMessage("El RUC debe tener 13 dígitos.");
+            .Matches(@"^\d{13}$").WithMessage("El RUC debe tener 13 dígitos.")
+            .ValidEcuadorianRuc().WithMessage("El RUC ingresado no es válido.");
 
         RuleFor(x => x.Email)
             .EmailAddress().WithMessage("Ingresa un correo de contacto válido.")

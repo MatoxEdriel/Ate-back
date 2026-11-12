@@ -3,6 +3,7 @@ namespace Ate.Application.Features.Restaurants.DTOs;
 public record AdminRestaurantDto(
     Guid Id,
     string Code,
+    string? TaxId,
     string Name,
     string Cuisine,
     string? Address,

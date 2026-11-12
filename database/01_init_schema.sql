@@ -136,7 +136,6 @@ CREATE TABLE IF NOT EXISTS employees (
     company_id UUID NOT NULL,
     person_id UUID NOT NULL,
     employee_code VARCHAR(50) NULL,
-    department VARCHAR(100) NULL,
     monthly_allowance NUMERIC(12,2) NOT NULL DEFAULT 0,
     is_intern BOOLEAN NOT NULL DEFAULT FALSE,
     qr_code_token VARCHAR(255) NOT NULL,
@@ -176,6 +175,79 @@ END $$;
 CREATE INDEX IF NOT EXISTS ix_employees_company_id
 ON employees(company_id)
 WHERE is_deleted = FALSE;
+
+-- 6.1 DEPARTMENTS (each company defines its own)
+CREATE TABLE IF NOT EXISTS departments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id UUID NOT NULL,
+    name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by UUID NULL,
+    updated_at TIMESTAMPTZ NULL,
+    updated_by UUID NULL,
+    is_deleted BOOLEAN NOT NULL DEFAULT FALSE,
+    deleted_at TIMESTAMPTZ NULL,
+    deleted_by UUID NULL,
+    CONSTRAINT fk_departments_companies FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE RESTRICT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_departments_company_name
+ON departments(company_id, lower(name))
+WHERE is_deleted = FALSE;
+
+CREATE INDEX IF NOT EXISTS ix_departments_company_id
+ON departments(company_id)
+WHERE is_deleted = FALSE;
+
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS department_id UUID NULL;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_employees_departments') THEN
+        ALTER TABLE employees
+            ADD CONSTRAINT fk_employees_departments FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE SET NULL;
+    END IF;
+END $$;
+
+CREATE INDEX IF NOT EXISTS ix_employees_department_id
+ON employees(department_id)
+WHERE department_id IS NOT NULL AND is_deleted = FALSE;
+
+-- Legacy: employees.department was free text. Turn every distinct value into a department of its
+-- company, link the employees and drop the old column. Runs once; afterwards the column no longer exists.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'employees' AND column_name = 'department'
+    ) THEN
+        INSERT INTO departments (company_id, name)
+        SELECT DISTINCT ON (e.company_id, lower(btrim(e.department))) e.company_id, btrim(e.department)
+        FROM employees e
+        WHERE e.department IS NOT NULL AND btrim(e.department) <> ''
+        ORDER BY e.company_id, lower(btrim(e.department)), btrim(e.department)
+        ON CONFLICT DO NOTHING;
+
+        UPDATE employees e
+        SET department_id = d.id
+        FROM departments d
+        WHERE e.department_id IS NULL
+          AND d.company_id = e.company_id
+          AND d.is_deleted = FALSE
+          AND lower(d.name) = lower(btrim(e.department));
+
+        ALTER TABLE employees DROP COLUMN department;
+    END IF;
+END $$;
+
+-- Every company starts with the default departments the first time this table appears.
+INSERT INTO departments (company_id, name)
+SELECT c.id, v.name
+FROM companies c
+CROSS JOIN (VALUES ('Administración'), ('Finanzas'), ('Operaciones'), ('Talento Humano'), ('Tecnología'), ('Ventas')) AS v(name)
+WHERE c.is_deleted = FALSE
+  AND NOT EXISTS (SELECT 1 FROM departments d WHERE d.company_id = c.id)
+ON CONFLICT DO NOTHING;
 
 -- 7. REFRESH_TOKENS
 CREATE TABLE IF NOT EXISTS refresh_tokens (
@@ -231,6 +303,7 @@ CREATE TABLE IF NOT EXISTS restaurants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     merchant_user_id UUID NULL,
     code VARCHAR(50) NOT NULL,
+    tax_id VARCHAR(13) NULL,
     name VARCHAR(150) NOT NULL,
     cuisine VARCHAR(80) NOT NULL,
     address VARCHAR(300) NULL,
@@ -259,6 +332,11 @@ CREATE TABLE IF NOT EXISTS restaurants (
 
 ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS latitude NUMERIC(9,6) NULL;
 ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS longitude NUMERIC(9,6) NULL;
+ALTER TABLE restaurants ADD COLUMN IF NOT EXISTS tax_id VARCHAR(13) NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_restaurants_tax_id
+ON restaurants(tax_id)
+WHERE tax_id IS NOT NULL AND is_deleted = FALSE;
 
 -- TEMPORAL: el logo viaja serializado (data URL base64) hasta que exista el servidor de imágenes.
 -- Cuando exista, volver a VARCHAR(500) con la URL pública del archivo.

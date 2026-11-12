@@ -11,6 +11,7 @@ public interface IApplicationDbContext
     DbSet<UserRole> UserRoles { get; }
     DbSet<Company> Companies { get; }
     DbSet<Employee> Employees { get; }
+    DbSet<Department> Departments { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<PasswordRecovery> PasswordRecoveries { get; }
     DbSet<UserExternalLogin> UserExternalLogins { get; }
