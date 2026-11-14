@@ -53,6 +53,28 @@ public static class MongoDbInitializer
             Builders<EmployeeOrder>.Update.Unset(o => o.ActiveSlot),
             cancellationToken: cancellationToken);
 
+        if (!existing.Contains(MongoCollections.PayrollSettlements))
+        {
+            await database.CreateCollectionAsync(MongoCollections.PayrollSettlements, cancellationToken: cancellationToken);
+        }
+
+        var settlements = database.GetCollection<PayrollSettlement>(MongoCollections.PayrollSettlements);
+        var settlementKeys = Builders<PayrollSettlement>.IndexKeys;
+
+        await settlements.Indexes.CreateManyAsync(
+        [
+            // Un corte por colaborador, tipo y período: impide cobrar dos veces.
+            new CreateIndexModel<PayrollSettlement>(
+                settlementKeys.Ascending(s => s.EmployeeId).Ascending(s => s.Type).Ascending(s => s.PeriodStart),
+                new CreateIndexOptions { Name = "ux_payroll_settlements_employee_type_period", Unique = true }),
+            new CreateIndexModel<PayrollSettlement>(
+                settlementKeys.Ascending(s => s.CompanyId).Ascending(s => s.PeriodStart),
+                new CreateIndexOptions { Name = "ix_payroll_settlements_company_period" }),
+            new CreateIndexModel<PayrollSettlement>(
+                settlementKeys.Ascending(s => s.EmployeeId).Descending(s => s.PeriodStart),
+                new CreateIndexOptions { Name = "ix_payroll_settlements_employee_period" })
+        ], cancellationToken);
+
         if (!existing.Contains(MongoCollections.DishCatalog))
         {
             await database.CreateCollectionAsync(MongoCollections.DishCatalog, cancellationToken: cancellationToken);

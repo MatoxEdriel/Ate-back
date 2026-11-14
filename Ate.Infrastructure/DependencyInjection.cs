@@ -35,6 +35,8 @@ public static class DependencyInjection
         services.AddSingleton<IAchievementQueue>(sp => sp.GetRequiredService<AchievementQueue>());
         services.AddHostedService<AchievementWorker>();
 
+        services.AddHostedService<PayrollCloseWorker>();
+
         services.AddOptions<PasswordRecoveryOptions>()
             .Bind(configuration.GetSection(PasswordRecoveryOptions.SectionName))
             .ValidateDataAnnotations()
