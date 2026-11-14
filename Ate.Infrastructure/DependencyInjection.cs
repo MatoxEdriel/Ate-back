@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddSingleton<IAchievementQueue>(sp => sp.GetRequiredService<AchievementQueue>());
         services.AddHostedService<AchievementWorker>();
 
+        QuestPDF.Settings.License = QuestPDF.Infrastructure.LicenseType.Community;
         services.AddHostedService<PayrollCloseWorker>();
 
         services.AddOptions<PasswordRecoveryOptions>()

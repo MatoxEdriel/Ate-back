@@ -1,9 +1,13 @@
 using Ate.Application.Common.Constants;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Features.Payroll;
+using Ate.Application.Features.Payroll.DTOs;
 using Ate.Domain.Common;
 using Ate.Domain.Entities;
 using Ate.Domain.Enums;
+using Ate.Domain.Errors;
+using Microsoft.EntityFrameworkCore;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace Ate.Infrastructure.Services;
@@ -16,9 +20,17 @@ public class PayrollSettlementService : IPayrollSettlementService, IScopedDepend
     private readonly IMongoCollection<EmployeeOrder> _orders;
     private readonly IMongoCollection<PayrollSettlement> _settlements;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IApplicationDbContext _context;
+    private readonly IPayrollPdfRenderer _pdfRenderer;
 
-    public PayrollSettlementService(IMongoDbContext mongoContext, IDateTimeProvider dateTimeProvider)
+    public PayrollSettlementService(
+        IMongoDbContext mongoContext,
+        IDateTimeProvider dateTimeProvider,
+        IApplicationDbContext context,
+        IPayrollPdfRenderer pdfRenderer)
     {
+        _context = context;
+        _pdfRenderer = pdfRenderer;
         _orders = mongoContext.GetCollection<EmployeeOrder>(MongoCollections.EmployeeOrders);
         _settlements = mongoContext.GetCollection<PayrollSettlement>(MongoCollections.PayrollSettlements);
         _dateTimeProvider = dateTimeProvider;
@@ -85,6 +97,93 @@ public class PayrollSettlementService : IPayrollSettlementService, IScopedDepend
 
         return Result.Success<PayrollSettlement?>(settlement);
     }
+
+    public async Task<Result<CurrentSpendingDto>> GetCurrentSpendingAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var employee = await GetEmployeeAsync(userId, cancellationToken);
+        if (employee == null)
+        {
+            return Result.Failure<CurrentSpendingDto>(PayrollErrors.EmployeeNotFound);
+        }
+
+        var today = BusinessToday();
+        var monthStart = new DateOnly(today.Year, today.Month, 1);
+        var lastSettledEnd = await GetLastSettledEndAsync(employee.Id, monthStart, today, cancellationToken);
+        var start = SettlementRules.MonthlyStart(monthStart, lastSettledEnd);
+
+        var orders = start > today
+            ? []
+            : await GetChargeableOrdersAsync(
+                Builders<EmployeeOrder>.Filter.Eq(o => o.EmployeeId, employee.Id), start, today, cancellationToken);
+
+        // Se arma con las mismas reglas del cierre, sin guardarlo.
+        var preview = SettlementRules.Build(SettlementType.Monthly, start, today, orders, _dateTimeProvider.UtcNow, null);
+
+        return Result.Success(new CurrentSpendingDto(
+            SettlementRules.Format(start),
+            SettlementRules.Format(today),
+            preview?.TotalAmount ?? 0m,
+            preview?.Currency ?? "USD",
+            preview?.OrderCount ?? 0,
+            preview?.Lines.Select(SettlementLineDto.From).ToList() ?? []));
+    }
+
+    public async Task<Result<IReadOnlyList<EmployeeSettlementDto>>> GetEmployeeSettlementsAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var employee = await GetEmployeeAsync(userId, cancellationToken);
+        if (employee == null)
+        {
+            return Result.Failure<IReadOnlyList<EmployeeSettlementDto>>(PayrollErrors.EmployeeNotFound);
+        }
+
+        var settlements = await _settlements
+            .Find(s => s.EmployeeId == employee.Id)
+            .SortByDescending(s => s.PeriodStart)
+            .ToListAsync(cancellationToken);
+
+        return Result.Success<IReadOnlyList<EmployeeSettlementDto>>(settlements.Select(EmployeeSettlementDto.From).ToList());
+    }
+
+    public async Task<Result<PdfFile>> GetEmployeeSettlementPdfAsync(Guid userId, string settlementId, CancellationToken cancellationToken = default)
+    {
+        var employee = await GetEmployeeAsync(userId, cancellationToken);
+        if (employee == null)
+        {
+            return Result.Failure<PdfFile>(PayrollErrors.EmployeeNotFound);
+        }
+
+        if (!ObjectId.TryParse(settlementId, out _))
+        {
+            return Result.Failure<PdfFile>(PayrollErrors.NotFound);
+        }
+
+        // Filtrar también por colaborador: nadie descarga el corte de otro.
+        var settlement = await _settlements
+            .Find(s => s.Id == settlementId && s.EmployeeId == employee.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (settlement == null)
+        {
+            return Result.Failure<PdfFile>(PayrollErrors.NotFound);
+        }
+
+        var content = _pdfRenderer.RenderEmployeeSettlement(settlement, employee.CompanyName);
+        return Result.Success(new PdfFile(content, $"consumo-{settlement.PeriodStart}.pdf"));
+    }
+
+    private sealed record EmployeeRef(Guid Id, string CompanyName);
+
+    private async Task<EmployeeRef?> GetEmployeeAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        return await _context.Employees
+            .AsNoTracking()
+            .Where(e => e.Person.UserId == userId)
+            .OrderByDescending(e => e.Status == EmployeeStatus.Active)
+            .Select(e => new EmployeeRef(e.Id, e.Company.TradeName))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private DateOnly BusinessToday() => DateOnly.FromDateTime(_dateTimeProvider.BusinessNow.DateTime);
 
     private async Task<List<EmployeeOrder>> GetChargeableOrdersAsync(
         FilterDefinition<EmployeeOrder> scope, DateOnly from, DateOnly to, CancellationToken cancellationToken)
