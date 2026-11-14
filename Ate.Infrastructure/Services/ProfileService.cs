@@ -1,6 +1,8 @@
+using Ate.Domain.Enums;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Features.Profile.DTOs;
 using Ate.Domain.Common;
+using Ate.Domain.Constants;
 using Ate.Domain.Entities;
 using Ate.Domain.Errors;
 using Microsoft.EntityFrameworkCore;
@@ -31,17 +33,27 @@ public class ProfileService : IProfileService, IScopedDependency
             return Result.Failure<ProfileDto>(ProfileErrors.NotFound);
         }
 
-        var company = user.Company ?? await _context.Employees
-            .AsNoTracking()
-            .Where(e => e.PersonId == user.Person.Id && e.IsActive)
-            .Select(e => e.Company)
-            .FirstOrDefaultAsync(cancellationToken);
-
         var roles = user.UserRoles
             .Where(ur => ur.Role != null && !string.IsNullOrWhiteSpace(ur.Role.Name))
             .Select(ur => ur.Role.Name)
             .Distinct()
             .ToList();
+
+        var employee = await _context.Employees
+            .AsNoTracking()
+            .Include(e => e.Company)
+            .Include(e => e.Department)
+            .Where(e => e.PersonId == user.Person.Id && e.Status == EmployeeStatus.Active)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        var company = user.Company ?? employee?.Company;
+
+        // Only the company admin sees the tax id and contact details of the company.
+        var includeCompanyDetails = roles.Contains(RoleConstants.CompanyAdmin) || roles.Contains(RoleConstants.SuperAdmin);
+
+        var employment = employee == null
+            ? null
+            : new ProfileEmploymentDto(employee.EmployeeCode, employee.Department?.Name, employee.IsIntern);
 
         var profile = new ProfileDto(
             user.Id,
@@ -56,12 +68,13 @@ public class ProfileService : IProfileService, IScopedDependency
             roles,
             user.LastLoginAt,
             user.CreatedAt,
-            ToCompanyDto(company));
+            ToCompanyDto(company, includeCompanyDetails),
+            employment);
 
         return Result.Success(profile);
     }
 
-    private static ProfileCompanyDto? ToCompanyDto(Company? company)
+    private static ProfileCompanyDto? ToCompanyDto(Company? company, bool includeDetails)
     {
         return company == null
             ? null
@@ -69,10 +82,10 @@ public class ProfileService : IProfileService, IScopedDependency
                 company.Id,
                 company.BusinessName,
                 company.TradeName,
-                company.TaxId,
-                company.Email,
-                company.Phone,
-                company.Address,
+                includeDetails ? company.TaxId : null,
+                includeDetails ? company.Email : null,
+                includeDetails ? company.Phone : null,
+                includeDetails ? company.Address : null,
                 company.LogoUrl,
                 company.IsActive);
     }

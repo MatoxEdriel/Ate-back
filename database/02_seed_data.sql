@@ -268,7 +268,7 @@ INSERT INTO employees (
     monthly_allowance,
     is_intern,
     qr_code_token,
-    is_active,
+    status,
     created_at,
     is_deleted
 )
@@ -285,7 +285,7 @@ VALUES (
     120.00,
     FALSE,
     '01928000000070008000000000000032',
-    TRUE,
+    'Active',
     CURRENT_TIMESTAMP,
     FALSE
 )
@@ -416,8 +416,8 @@ VALUES
     ('01928000-0000-7000-8000-000000000145', 3, CURRENT_TIMESTAMP)
 ON CONFLICT DO NOTHING;
 
-INSERT INTO employees (id, company_id, person_id, employee_code, department_id, monthly_allowance, is_intern, qr_code_token, is_active, created_at, is_deleted)
-SELECT v.id::uuid, c.id, p.id, v.code, d.id, v.allowance, v.is_intern, replace(v.id, '-', ''), v.is_active, CURRENT_TIMESTAMP - (v.days_ago || ' days')::interval, FALSE
+INSERT INTO employees (id, company_id, person_id, employee_code, department_id, monthly_allowance, is_intern, qr_code_token, status, created_at, is_deleted)
+SELECT v.id::uuid, c.id, p.id, v.code, d.id, v.allowance, v.is_intern, replace(v.id, '-', ''), CASE WHEN v.is_active THEN 'Active' ELSE 'Inactive' END, CURRENT_TIMESTAMP - (v.days_ago || ' days')::interval, FALSE
 FROM (VALUES
     ('01928000-0000-7000-8000-000000000108', '0923456781', 'EMP-002', 'Talento Humano', 150.00, FALSE, TRUE, 60),
     ('01928000-0000-7000-8000-000000000111', '0934567812', 'EMP-003', 'Tecnología', 120.00, FALSE, TRUE, 56),

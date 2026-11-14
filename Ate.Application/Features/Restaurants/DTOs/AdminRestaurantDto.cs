@@ -14,4 +14,4 @@ public record AdminRestaurantDto(
     int ActiveAgreements,
     DateTimeOffset CreatedAt);
 
-public record UpdateRestaurantStatusRequest(bool IsActive);
+public record UpdateRestaurantStatusRequest(bool IsActive, string? CurrentPassword = null);

@@ -11,4 +11,6 @@ public record EmployeeDto(
     string Department,
     bool IsIntern,
     bool IsActive,
+    /// <summary>"Active", "Inactive" or "NotCurrent" (no longer belongs to the company).</summary>
+    string Status,
     DateTimeOffset CreatedAt);

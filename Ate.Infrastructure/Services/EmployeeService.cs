@@ -136,7 +136,7 @@ public class EmployeeService : IEmployeeService, IScopedDependency
             Department = department,
             MonthlyAllowance = 0m,
             IsIntern = request.IsIntern,
-            IsActive = true
+            Status = EmployeeStatus.Active
         };
 
         _context.Users.Add(user);
@@ -231,7 +231,13 @@ public class EmployeeService : IEmployeeService, IScopedDependency
             return Result.Failure<EmployeeDto>(EmployeeErrors.NotFound);
         }
 
-        employee.IsActive = request.IsActive;
+        // "No vigente" means the person left the company; that change has its own flow.
+        if (employee.Status == EmployeeStatus.NotCurrent)
+        {
+            return Result.Failure<EmployeeDto>(EmployeeErrors.NotCurrent);
+        }
+
+        employee.Status = request.IsActive ? EmployeeStatus.Active : EmployeeStatus.Inactive;
         await _context.SaveChangesAsync(cancellationToken);
 
         return Result.Success(ToDto(employee));
@@ -258,7 +264,8 @@ public class EmployeeService : IEmployeeService, IScopedDependency
             employee.DepartmentId,
             employee.Department?.Name ?? string.Empty,
             employee.IsIntern,
-            employee.IsActive,
+            employee.Status == EmployeeStatus.Active,
+            employee.Status.ToString(),
             employee.CreatedAt);
     }
 }

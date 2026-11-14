@@ -45,12 +45,13 @@ public class AdminRestaurantsController : ControllerBase
 
     [HttpPatch("{restaurantId:guid}/status")]
     [EndpointSummary("Activate or deactivate a restaurant")]
-    [EndpointDescription("A deactivated restaurant stops appearing for every company and cannot receive orders. Agreements are kept.")]
+    [EndpointDescription("A deactivated restaurant stops appearing for every company and cannot receive orders. Agreements are kept. Deactivating requires the current user password.")]
     [ProducesResponseType(typeof(ApiResponse<AdminRestaurantDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<AdminRestaurantDto>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<AdminRestaurantDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStatus(Guid restaurantId, [FromBody] UpdateRestaurantStatusRequest request, CancellationToken cancellationToken)
     {
-        var result = await _restaurantService.UpdateStatusAsync(restaurantId, request, cancellationToken);
+        var result = await _restaurantService.UpdateStatusAsync(restaurantId, request, User.GetUserId(), cancellationToken);
         return result.ToActionResult(this, "Restaurant status updated successfully.");
     }
 }

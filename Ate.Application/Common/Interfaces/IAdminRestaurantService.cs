@@ -7,5 +7,5 @@ public interface IAdminRestaurantService
 {
     Task<Result<IReadOnlyList<AdminRestaurantDto>>> GetAllAsync(CancellationToken cancellationToken = default);
     Task<Result<CreateRestaurantResponse>> CreateAsync(CreateRestaurantRequest request, CancellationToken cancellationToken = default);
-    Task<Result<AdminRestaurantDto>> UpdateStatusAsync(Guid restaurantId, UpdateRestaurantStatusRequest request, CancellationToken cancellationToken = default);
+    Task<Result<AdminRestaurantDto>> UpdateStatusAsync(Guid restaurantId, UpdateRestaurantStatusRequest request, Guid? userId = null, CancellationToken cancellationToken = default);
 }

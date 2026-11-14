@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS employees (
     monthly_allowance NUMERIC(12,2) NOT NULL DEFAULT 0,
     is_intern BOOLEAN NOT NULL DEFAULT FALSE,
     qr_code_token VARCHAR(255) NOT NULL,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by UUID NULL,
     updated_at TIMESTAMPTZ NULL,
@@ -161,6 +161,27 @@ WHERE is_deleted = FALSE;
 
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS monthly_allowance NUMERIC(12,2) NOT NULL DEFAULT 0;
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS is_intern BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Employee status (Active / Inactive / NotCurrent) replaces the old is_active flag.
+-- Existing rows are migrated once: TRUE -> Active, FALSE -> Inactive.
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'employees' AND column_name = 'is_active'
+    ) THEN
+        ALTER TABLE employees ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'Active';
+        UPDATE employees SET status = CASE WHEN is_active THEN 'Active' ELSE 'Inactive' END;
+        ALTER TABLE employees DROP COLUMN is_active;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'ck_employees_status'
+    ) THEN
+        ALTER TABLE employees
+            ADD CONSTRAINT ck_employees_status CHECK (status IN ('Active', 'Inactive', 'NotCurrent'));
+    END IF;
+END $$;
 
 DO $$
 BEGIN

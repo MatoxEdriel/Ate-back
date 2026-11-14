@@ -19,6 +19,7 @@ public class AuthService : IAuthService, IScopedDependency
     private readonly IValidator<LoginRequest> _loginValidator;
     private readonly IValidator<ChangePasswordRequest> _changePasswordValidator;
     private readonly ILoginAttemptLimiter _loginAttemptLimiter;
+    private readonly IUserAccessValidator _accessValidator;
 
     public AuthService(
         IApplicationDbContext context,
@@ -27,7 +28,8 @@ public class AuthService : IAuthService, IScopedDependency
         IDateTimeProvider dateTimeProvider,
         IValidator<LoginRequest> loginValidator,
         IValidator<ChangePasswordRequest> changePasswordValidator,
-        ILoginAttemptLimiter loginAttemptLimiter)
+        ILoginAttemptLimiter loginAttemptLimiter,
+        IUserAccessValidator accessValidator)
     {
         _context = context;
         _passwordHasher = passwordHasher;
@@ -36,6 +38,7 @@ public class AuthService : IAuthService, IScopedDependency
         _loginValidator = loginValidator;
         _changePasswordValidator = changePasswordValidator;
         _loginAttemptLimiter = loginAttemptLimiter;
+        _accessValidator = accessValidator;
     }
 
     private static string? _dummyPasswordHash;
@@ -93,6 +96,13 @@ public class AuthService : IAuthService, IScopedDependency
         if (user.Company is { IsActive: false })
         {
             return Result.Failure<LoginResponse>(AuthErrors.CompanyInactive);
+        }
+
+        // Also covers employees deactivated by HR and employees of a deactivated company.
+        var accessError = await _accessValidator.ValidateAsync(user.Id, cancellationToken);
+        if (accessError is { } blocked)
+        {
+            return Result.Failure<LoginResponse>(blocked);
         }
 
         var roles = user.UserRoles
@@ -169,6 +179,13 @@ public class AuthService : IAuthService, IScopedDependency
         if (user.Company is { IsActive: false })
         {
             return Result.Failure<LoginResponse>(AuthErrors.CompanyInactive);
+        }
+
+        // Also covers employees deactivated by HR and employees of a deactivated company.
+        var accessError = await _accessValidator.ValidateAsync(user.Id, cancellationToken);
+        if (accessError is { } blocked)
+        {
+            return Result.Failure<LoginResponse>(blocked);
         }
 
         if (user.MustChangePassword)

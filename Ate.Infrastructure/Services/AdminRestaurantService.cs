@@ -183,12 +183,34 @@ public class AdminRestaurantService : IAdminRestaurantService, IScopedDependency
             welcomeEmailSent));
     }
 
-    public async Task<Result<AdminRestaurantDto>> UpdateStatusAsync(Guid restaurantId, UpdateRestaurantStatusRequest request, CancellationToken cancellationToken = default)
+    public async Task<Result<AdminRestaurantDto>> UpdateStatusAsync(Guid restaurantId, UpdateRestaurantStatusRequest request, Guid? userId = null, CancellationToken cancellationToken = default)
     {
         var restaurant = await _context.Restaurants.FirstOrDefaultAsync(r => r.Id == restaurantId, cancellationToken);
         if (restaurant == null)
         {
             return Result.Failure<AdminRestaurantDto>(AdminRestaurantErrors.NotFound);
+        }
+
+        if (!request.IsActive)
+        {
+            if (string.IsNullOrWhiteSpace(request.CurrentPassword))
+            {
+                return Result.Failure<AdminRestaurantDto>(Error.Validation("Restaurant.PasswordRequired", "Debes ingresar tu contraseña para desactivar el restaurante."));
+            }
+
+            if (userId.HasValue)
+            {
+                var passwordHash = await _context.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == userId.Value)
+                    .Select(u => u.PasswordHash)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (string.IsNullOrEmpty(passwordHash) || !_passwordHasher.VerifyPassword(request.CurrentPassword, passwordHash))
+                {
+                    return Result.Failure<AdminRestaurantDto>(Error.Validation("Restaurant.InvalidPassword", "La contraseña es incorrecta."));
+                }
+            }
         }
 
         restaurant.IsActive = request.IsActive;

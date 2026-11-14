@@ -13,4 +13,5 @@ public record ProfileDto(
     IReadOnlyList<string> Roles,
     DateTimeOffset? LastLoginAt,
     DateTimeOffset CreatedAt,
-    ProfileCompanyDto? Company);
+    ProfileCompanyDto? Company,
+    ProfileEmploymentDto? Employment = null);

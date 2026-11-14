@@ -16,6 +16,9 @@ public static class EmployeeErrors
     public static readonly Error EmailAlreadyExists =
         Error.Conflict("Employee.EmailAlreadyExists", "Ya existe una cuenta registrada con este correo.");
 
+    public static readonly Error NotCurrent =
+        Error.Validation("Employee.NotCurrent", "Este colaborador ya no pertenece a la empresa y no se puede reactivar desde aquí.");
+
     public static readonly Error CodeAlreadyExists =
         Error.Conflict("Employee.CodeAlreadyExists", "Ya existe un colaborador con este código en tu empresa.");
 }

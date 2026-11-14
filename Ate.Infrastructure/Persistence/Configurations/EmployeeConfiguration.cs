@@ -1,4 +1,5 @@
 using Ate.Domain.Entities;
+using Ate.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -41,9 +42,11 @@ public class EmployeeConfiguration : IEntityTypeConfiguration<Employee>
             .IsUnique()
             .HasFilter("is_deleted = false");
 
-        builder.Property(e => e.IsActive)
+        builder.Property(e => e.Status)
+            .HasConversion<string>()
+            .HasMaxLength(20)
             .IsRequired()
-            .HasDefaultValue(true);
+            .HasDefaultValue(EmployeeStatus.Active);
 
         builder.HasOne(e => e.Company)
             .WithMany(c => c.Employees)

@@ -294,7 +294,7 @@ public static partial class AteDbSeeder
             DepartmentId = departments.GetValueOrDefault("Tecnología"),
             MonthlyAllowance = 120m,
             IsIntern = false,
-            IsActive = true
+            Status = EmployeeStatus.Active
         };
 
         context.Users.Add(user);
@@ -463,7 +463,7 @@ public static partial class AteDbSeeder
                 DepartmentId = departments.GetValueOrDefault(sample.Department),
                 MonthlyAllowance = sample.Allowance,
                 IsIntern = sample.IsIntern,
-                IsActive = sample.IsActive
+                Status = sample.IsActive ? EmployeeStatus.Active : EmployeeStatus.Inactive
             });
         }
 

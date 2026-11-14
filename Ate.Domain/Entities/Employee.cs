@@ -1,4 +1,5 @@
 using Ate.Domain.Common;
+using Ate.Domain.Enums;
 
 namespace Ate.Domain.Entities;
 
@@ -14,5 +15,5 @@ public class Employee : BaseAuditableEntity
     public decimal MonthlyAllowance { get; set; }
     public bool IsIntern { get; set; }
     public string QrCodeToken { get; set; } = Guid.CreateVersion7().ToString("N");
-    public bool IsActive { get; set; } = true;
+    public EmployeeStatus Status { get; set; } = EmployeeStatus.Active;
 }

@@ -1,4 +1,5 @@
 using System.Text;
+using Ate.Api.Extensions;
 using Ate.Api.Middlewares;
 using Ate.Api.OpenApi;
 using Ate.Api.Services;
@@ -10,6 +11,7 @@ using Ate.Domain.Common;
 using Ate.Domain.Errors;
 using Ate.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.Extensions.Caching.Memory;
 using System.Globalization;
 using Microsoft.IdentityModel.Tokens;
 
@@ -55,16 +57,35 @@ public static class DependencyInjection
             };
             options.Events = new JwtBearerEvents
             {
+                // A valid token is not enough: the account must still be active on every request.
+                OnTokenValidated = async context =>
+                {
+                    var userId = context.Principal.GetUserId();
+                    if (!userId.HasValue)
+                    {
+                        context.Fail("Token without user id.");
+                        return;
+                    }
+
+                    var error = await GetAccessErrorAsync(context.HttpContext, userId.Value);
+                    if (error is { } blocked)
+                    {
+                        context.HttpContext.Items[AccessErrorItemKey] = blocked;
+                        context.Fail(blocked.Description);
+                    }
+                },
                 OnChallenge = async context =>
                 {
                     context.HandleResponse();
-                    await WriteAuthErrorAsync(context.Response, StatusCodes.Status401Unauthorized, AuthErrors.InvalidToken);
+                    var error = context.HttpContext.Items[AccessErrorItemKey] is Error blocked ? blocked : AuthErrors.InvalidToken;
+                    await WriteAuthErrorAsync(context.Response, StatusCodes.Status401Unauthorized, error);
                 },
                 OnForbidden = context =>
                     WriteAuthErrorAsync(context.Response, StatusCodes.Status403Forbidden, AuthErrors.Forbidden)
             };
         });
 
+        services.AddMemoryCache();
         services.AddAuthorization();
 
         services.AddRateLimiter(options =>
@@ -122,6 +143,28 @@ public static class DependencyInjection
         });
 
         return services;
+    }
+
+    private const string AccessErrorItemKey = "Auth.AccessError";
+
+    /// <summary>How long an account status check is reused before asking the database again.</summary>
+    private static readonly TimeSpan AccessCheckCacheDuration = TimeSpan.FromSeconds(30);
+
+    private sealed record AccessCheck(Error? Error);
+
+    private static async Task<Error?> GetAccessErrorAsync(HttpContext httpContext, Guid userId)
+    {
+        var cache = httpContext.RequestServices.GetRequiredService<IMemoryCache>();
+        var cacheKey = $"user-access:{userId}";
+        if (cache.TryGetValue(cacheKey, out AccessCheck? cached) && cached != null)
+        {
+            return cached.Error;
+        }
+
+        var validator = httpContext.RequestServices.GetRequiredService<IUserAccessValidator>();
+        var error = await validator.ValidateAsync(userId, httpContext.RequestAborted);
+        cache.Set(cacheKey, new AccessCheck(error), AccessCheckCacheDuration);
+        return error;
     }
 
     private static async Task WriteAuthErrorAsync(HttpResponse response, int statusCode, Error error)
