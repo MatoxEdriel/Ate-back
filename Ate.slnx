@@ -3,4 +3,5 @@
   <Project Path="Ate.Application/Ate.Application.csproj" />
   <Project Path="Ate.Domain/Ate.Domain.csproj" />
   <Project Path="Ate.Infrastructure/Ate.Infrastructure.csproj" />
+  <Project Path="Ate.Tests/Ate.Tests.csproj" />
 </Solution>
