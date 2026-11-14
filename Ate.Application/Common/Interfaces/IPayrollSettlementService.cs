@@ -13,6 +13,12 @@ public interface IPayrollSettlementService
     Task<int> GenerateMonthlyAsync(DateOnly monthStart, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Cierra el mes una sola vez: si ya hay registro de cierre no hace nada; si no, genera los cortes y deja
+    /// el registro. Devuelve los cortes creados, o null si el mes ya estaba cerrado.
+    /// </summary>
+    Task<int?> CloseMonthAsync(DateOnly monthStart, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Genera el corte de liquidación de un colaborador hasta su fecha de salida.
     /// Lo usará el flujo de salida (No vigente); hoy nada lo llama.
     /// </summary>

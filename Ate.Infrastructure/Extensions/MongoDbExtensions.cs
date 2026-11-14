@@ -81,6 +81,12 @@ public static class MongoDbExtensions
                 .SetSerializer(new StringSerializer(BsonType.ObjectId));
         });
 
+        BsonClassMap.TryRegisterClassMap<PayrollClose>(map =>
+        {
+            map.AutoMap();
+            map.MapIdMember(c => c.Id);
+        });
+
         BsonClassMap.TryRegisterClassMap<DishCatalogEntry>(map =>
         {
             map.AutoMap();

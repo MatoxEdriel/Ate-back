@@ -12,6 +12,9 @@ public static class SettlementRules
 {
     public const string DateFormat = "yyyy-MM-dd";
 
+    /// <summary>Día del mes desde el que se cierra el mes anterior: da un día a los restaurantes para confirmar los últimos pedidos.</summary>
+    public const int CloseDay = 2;
+
     /// <summary>Solo se cobran los pedidos confirmados, listos o entregados.</summary>
     public static bool IsChargeable(string status) =>
         status is EmployeeOrderStatus.Confirmed or EmployeeOrderStatus.Ready or EmployeeOrderStatus.Delivered;
@@ -85,6 +88,30 @@ public static class SettlementRules
             GeneratedByUserId = generatedBy,
         };
     }
+
+    /// <summary>
+    /// Fin más tardío entre los cortes que se cruzan con [from, to]. Considera cualquier cruce, no solo los que
+    /// terminan dentro del rango: un mensual del 1 al 30 ya cubre una salida registrada después con fecha 28.
+    /// </summary>
+    public static DateOnly? LatestCoveredEnd(IEnumerable<(string Start, string End)> existing, DateOnly from, DateOnly to)
+    {
+        var fromText = Format(from);
+        var toText = Format(to);
+
+        var latest = existing
+            .Where(s => string.CompareOrdinal(s.Start, toText) <= 0 && string.CompareOrdinal(s.End, fromText) >= 0)
+            .Select(s => s.End)
+            .OrderByDescending(end => end, StringComparer.Ordinal)
+            .FirstOrDefault();
+
+        return latest == null ? null : Parse(latest);
+    }
+
+    /// <summary>Mes que corresponde cerrar en <paramref name="businessToday"/>, o null si todavía no toca.</summary>
+    public static DateOnly? MonthToClose(DateOnly businessToday) =>
+        businessToday.Day < CloseDay
+            ? null
+            : new DateOnly(businessToday.Year, businessToday.Month, 1).AddMonths(-1);
 
     public static string Format(DateOnly date) => date.ToString(DateFormat, CultureInfo.InvariantCulture);
 

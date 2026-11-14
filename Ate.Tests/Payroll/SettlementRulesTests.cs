@@ -61,6 +61,46 @@ public class SettlementRulesTests
         => Assert.Equal(new DateOnly(2026, 11, 16), SettlementRules.TerminationStart(new DateOnly(2026, 11, 20), new DateOnly(2026, 11, 15)));
 
     [Fact]
+    public void LatestCoveredEnd_MonthlyEndingAfterBackdatedExit_IsFound()
+    {
+        // Ya existe el mensual de noviembre (1-30) y RRHH registra después una salida al 28.
+        var existing = new[] { ("2026-11-01", "2026-11-30") };
+
+        var lastEnd = SettlementRules.LatestCoveredEnd(existing, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 28));
+
+        Assert.Equal(new DateOnly(2026, 11, 30), lastEnd);
+        // Todo lo de noviembre ya se descontó del sueldo: la liquidación empieza después de la salida (no cobra nada).
+        Assert.True(SettlementRules.TerminationStart(new DateOnly(2026, 11, 28), lastEnd) > new DateOnly(2026, 11, 28));
+    }
+
+    [Fact]
+    public void LatestCoveredEnd_IgnoresSettlementsOutsideRange()
+    {
+        var existing = new[] { ("2026-10-01", "2026-10-31"), ("2026-12-01", "2026-12-31") };
+
+        Assert.Null(SettlementRules.LatestCoveredEnd(existing, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 28)));
+    }
+
+    [Fact]
+    public void LatestCoveredEnd_TakesTheLatestOverlappingEnd()
+    {
+        var existing = new[] { ("2026-11-01", "2026-11-10"), ("2026-11-11", "2026-11-20") };
+
+        Assert.Equal(new DateOnly(2026, 11, 20), SettlementRules.LatestCoveredEnd(existing, new DateOnly(2026, 11, 1), new DateOnly(2026, 11, 30)));
+    }
+
+    [Fact]
+    public void MonthToClose_OnDay1_IsNotYetDue()
+        => Assert.Null(SettlementRules.MonthToClose(new DateOnly(2026, 12, 1)));
+
+    [Fact]
+    public void MonthToClose_FromDay2_IsPreviousMonth()
+    {
+        Assert.Equal(new DateOnly(2026, 11, 1), SettlementRules.MonthToClose(new DateOnly(2026, 12, 2)));
+        Assert.Equal(new DateOnly(2026, 12, 1), SettlementRules.MonthToClose(new DateOnly(2027, 1, 15)));
+    }
+
+    [Fact]
     public void Build_CountsOnlyChargeableOrdersInsidePeriod()
     {
         var orders = new[]

@@ -19,6 +19,7 @@ public class PayrollSettlementService : IPayrollSettlementService, IScopedDepend
 
     private readonly IMongoCollection<EmployeeOrder> _orders;
     private readonly IMongoCollection<PayrollSettlement> _settlements;
+    private readonly IMongoCollection<PayrollClose> _closes;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IApplicationDbContext _context;
     private readonly IPayrollPdfRenderer _pdfRenderer;
@@ -33,6 +34,7 @@ public class PayrollSettlementService : IPayrollSettlementService, IScopedDepend
         _pdfRenderer = pdfRenderer;
         _orders = mongoContext.GetCollection<EmployeeOrder>(MongoCollections.EmployeeOrders);
         _settlements = mongoContext.GetCollection<PayrollSettlement>(MongoCollections.PayrollSettlements);
+        _closes = mongoContext.GetCollection<PayrollClose>(MongoCollections.PayrollCloses);
         _dateTimeProvider = dateTimeProvider;
     }
 
@@ -61,6 +63,30 @@ public class PayrollSettlementService : IPayrollSettlementService, IScopedDepend
             {
                 created++;
             }
+        }
+
+        return created;
+    }
+
+    public async Task<int?> CloseMonthAsync(DateOnly monthStart, CancellationToken cancellationToken = default)
+    {
+        var month = monthStart.ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture);
+        if (await _closes.Find(c => c.Id == month).AnyAsync(cancellationToken))
+        {
+            return null;
+        }
+
+        var created = await GenerateMonthlyAsync(monthStart, cancellationToken);
+
+        try
+        {
+            await _closes.InsertOneAsync(
+                new PayrollClose { Id = month, ClosedAt = _dateTimeProvider.UtcNow, SettlementsCreated = created },
+                cancellationToken: cancellationToken);
+        }
+        catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+        {
+            // Otra instancia lo cerró al mismo tiempo; los cortes son únicos, así que no hay duplicados.
         }
 
         return created;
@@ -242,9 +268,16 @@ public class PayrollSettlementService : IPayrollSettlementService, IScopedDepend
             scope.Value.MonthEnd,
             cancellationToken);
 
+        var employees = orders.Select(o => o.EmployeeId).Distinct().Count();
+        if (employees < CompanyUsageDto.MinEmployees)
+        {
+            return Result.Success(new CompanyUsageDto(month, false, null, null, null, "USD"));
+        }
+
         return Result.Success(new CompanyUsageDto(
             month,
-            orders.Select(o => o.EmployeeId).Distinct().Count(),
+            true,
+            employees,
             orders.Count,
             orders.Sum(o => o.TotalAmount),
             "USD"));
@@ -326,23 +359,19 @@ public class PayrollSettlementService : IPayrollSettlementService, IScopedDepend
             .ToListAsync(cancellationToken);
     }
 
-    /// <summary>Fin del último corte del colaborador que terminó dentro del rango, si existe.</summary>
+    /// <summary>Fin más tardío de los cortes del colaborador que se cruzan con el rango, si existe.</summary>
     private async Task<DateOnly?> GetLastSettledEndAsync(Guid employeeId, DateOnly from, DateOnly to, CancellationToken cancellationToken)
     {
-        var fromText = SettlementRules.Format(from);
-        var toText = SettlementRules.Format(to);
-
         var filter = Builders<PayrollSettlement>.Filter;
-        var last = await _settlements
+        var overlapping = await _settlements
             .Find(filter.And(
                 filter.Eq(s => s.EmployeeId, employeeId),
-                filter.Gte(s => s.PeriodEnd, fromText),
-                filter.Lte(s => s.PeriodEnd, toText)))
-            .SortByDescending(s => s.PeriodEnd)
-            .Project(s => s.PeriodEnd)
-            .FirstOrDefaultAsync(cancellationToken);
+                filter.Lte(s => s.PeriodStart, SettlementRules.Format(to)),
+                filter.Gte(s => s.PeriodEnd, SettlementRules.Format(from))))
+            .Project(s => new { s.PeriodStart, s.PeriodEnd })
+            .ToListAsync(cancellationToken);
 
-        return last == null ? null : SettlementRules.Parse(last);
+        return SettlementRules.LatestCoveredEnd(overlapping.Select(s => (s.PeriodStart, s.PeriodEnd)), from, to);
     }
 
     /// <summary>Inserta el corte. Devuelve false si ya existía (índice único).</summary>

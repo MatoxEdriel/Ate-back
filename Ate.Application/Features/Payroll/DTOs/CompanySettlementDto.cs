@@ -14,8 +14,7 @@ public record CompanySettlementDto(
     string EmployeeName,
     string EmployeeDocument,
     decimal TotalAmount,
-    string Currency,
-    int OrderCount)
+    string Currency)
 {
     public static CompanySettlementDto From(PayrollSettlement s) => new(
         s.Id,
@@ -25,14 +24,21 @@ public record CompanySettlementDto(
         s.EmployeeName,
         s.EmployeeDocument,
         s.TotalAmount,
-        s.Currency,
-        s.OrderCount);
+        s.Currency);
 }
 
-/// <summary>Uso de Ate en toda la empresa durante un mes. Agregado: sin datos por persona ni por área.</summary>
+/// <summary>
+/// Uso de Ate en toda la empresa durante un mes. Agregado: sin datos por persona ni por área.
+/// Si pidieron menos de <see cref="MinEmployees"/> colaboradores, las cifras no se envían
+/// (<see cref="HasEnoughData"/> = false): con tan pocos, RRHH podría deducir el gasto de una persona.
+/// </summary>
 public record CompanyUsageDto(
     string Month,
-    int EmployeesWithOrders,
-    int OrderCount,
-    decimal TotalAmount,
-    string Currency);
+    bool HasEnoughData,
+    int? EmployeesWithOrders,
+    int? OrderCount,
+    decimal? TotalAmount,
+    string Currency)
+{
+    public const int MinEmployees = 5;
+}

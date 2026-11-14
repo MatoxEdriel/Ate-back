@@ -1,4 +1,5 @@
 using Ate.Application.Common.Interfaces;
+using Ate.Application.Features.Payroll;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -6,8 +7,8 @@ using Microsoft.Extensions.Logging;
 namespace Ate.Infrastructure.Services;
 
 /// <summary>
-/// Cierre mensual de nómina. Revisa cada hora (y al arrancar) si el mes anterior ya se cerró en este proceso;
-/// si no, genera sus cortes. La generación es idempotente, así que reiniciar el servidor no duplica cortes.
+/// Cierre mensual de nómina. Revisa cada hora (y al arrancar) si toca cerrar el mes anterior (desde el día
+/// <see cref="SettlementRules.CloseDay"/>). Cada mes se cierra una sola vez: queda registrado en payroll_closes.
 /// </summary>
 public sealed class PayrollCloseWorker : BackgroundService
 {
@@ -38,8 +39,8 @@ public sealed class PayrollCloseWorker : BackgroundService
     private async Task CloseLastMonthAsync(CancellationToken stoppingToken)
     {
         var today = DateOnly.FromDateTime(_dateTimeProvider.BusinessNow.DateTime);
-        var previousMonth = new DateOnly(today.Year, today.Month, 1).AddMonths(-1);
-        if (_lastClosedMonth == previousMonth)
+        var month = SettlementRules.MonthToClose(today);
+        if (month == null || _lastClosedMonth == month)
         {
             return;
         }
@@ -48,16 +49,19 @@ public sealed class PayrollCloseWorker : BackgroundService
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var payroll = scope.ServiceProvider.GetRequiredService<IPayrollSettlementService>();
-            var created = await payroll.GenerateMonthlyAsync(previousMonth, stoppingToken);
-            _lastClosedMonth = previousMonth;
-            _logger.LogInformation("Payroll close for {Month}: {Count} settlements created.", previousMonth.ToString("yyyy-MM"), created);
+            var created = await payroll.CloseMonthAsync(month.Value, stoppingToken);
+            _lastClosedMonth = month;
+            if (created.HasValue)
+            {
+                _logger.LogInformation("Payroll close for {Month}: {Count} settlements created.", month.Value.ToString("yyyy-MM"), created.Value);
+            }
         }
         catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
         {
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Payroll close for {Month} failed; it will be retried.", previousMonth.ToString("yyyy-MM"));
+            _logger.LogError(ex, "Payroll close for {Month} failed; it will be retried.", month.Value.ToString("yyyy-MM"));
         }
     }
 }
