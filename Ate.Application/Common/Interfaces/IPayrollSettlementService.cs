@@ -21,4 +21,11 @@ public interface IPayrollSettlementService
     Task<Result<CurrentSpendingDto>> GetCurrentSpendingAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<Result<IReadOnlyList<EmployeeSettlementDto>>> GetEmployeeSettlementsAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<Result<PdfFile>> GetEmployeeSettlementPdfAsync(Guid userId, string settlementId, CancellationToken cancellationToken = default);
+
+    /// <summary>Cortes de la empresa del admin cuyo período empieza en el mes indicado (yyyy-MM).</summary>
+    Task<Result<IReadOnlyList<CompanySettlementDto>>> GetCompanySettlementsAsync(Guid adminUserId, string month, CancellationToken cancellationToken = default);
+    Task<Result<PdfFile>> GetCompanyMonthlyPdfAsync(Guid adminUserId, string month, CancellationToken cancellationToken = default);
+    /// <summary>PDF de una liquidación de la empresa. Un corte mensual devuelve NotFound: va en el PDF del mes.</summary>
+    Task<Result<PdfFile>> GetCompanyTerminationPdfAsync(Guid adminUserId, string settlementId, CancellationToken cancellationToken = default);
+    Task<Result<CompanyUsageDto>> GetCompanyUsageAsync(Guid adminUserId, string month, CancellationToken cancellationToken = default);
 }

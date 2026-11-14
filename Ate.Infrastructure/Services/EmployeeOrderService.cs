@@ -263,34 +263,6 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
             : Result.Success(ToDto(updated));
     }
 
-    public async Task<Result<PagedResult<EmployeeOrderDto>>> GetCompanyEmployeeOrdersAsync(Guid adminUserId, Guid employeeId, PaginationParams pagination, CancellationToken cancellationToken = default)
-    {
-        var companyId = await _context.Users
-            .AsNoTracking()
-            .Where(u => u.Id == adminUserId)
-            .Select(u => u.CompanyId)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        if (!companyId.HasValue)
-        {
-            return Result.Failure<PagedResult<EmployeeOrderDto>>(EmployeeErrors.CompanyNotAssigned);
-        }
-
-        var employeeExists = await _context.Employees
-            .AnyAsync(e => e.Id == employeeId && e.CompanyId == companyId.Value, cancellationToken);
-
-        if (!employeeExists)
-        {
-            return Result.Failure<PagedResult<EmployeeOrderDto>>(EmployeeErrors.NotFound);
-        }
-
-        var filter = Builders<EmployeeOrder>.Filter.And(
-            Builders<EmployeeOrder>.Filter.Eq(o => o.CompanyId, companyId.Value),
-            Builders<EmployeeOrder>.Filter.Eq(o => o.EmployeeId, employeeId));
-
-        return Result.Success(await GetPagedAsync(filter, pagination, cancellationToken));
-    }
-
     private async Task<Guid?> GetEmployeeIdAsync(Guid userId, CancellationToken cancellationToken)
     {
         return await _context.Employees

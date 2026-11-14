@@ -171,6 +171,134 @@ public class PayrollSettlementService : IPayrollSettlementService, IScopedDepend
         return Result.Success(new PdfFile(content, $"consumo-{settlement.PeriodStart}.pdf"));
     }
 
+    public async Task<Result<IReadOnlyList<CompanySettlementDto>>> GetCompanySettlementsAsync(Guid adminUserId, string month, CancellationToken cancellationToken = default)
+    {
+        var scope = await GetCompanyScopeAsync(adminUserId, month, cancellationToken);
+        if (scope.IsFailure)
+        {
+            return Result.Failure<IReadOnlyList<CompanySettlementDto>>(scope.Error);
+        }
+
+        var settlements = await FindCompanySettlementsAsync(scope.Value, null, cancellationToken);
+        return Result.Success<IReadOnlyList<CompanySettlementDto>>(settlements.Select(CompanySettlementDto.From).ToList());
+    }
+
+    public async Task<Result<PdfFile>> GetCompanyMonthlyPdfAsync(Guid adminUserId, string month, CancellationToken cancellationToken = default)
+    {
+        var scope = await GetCompanyScopeAsync(adminUserId, month, cancellationToken);
+        if (scope.IsFailure)
+        {
+            return Result.Failure<PdfFile>(scope.Error);
+        }
+
+        var settlements = await FindCompanySettlementsAsync(scope.Value, SettlementType.Monthly, cancellationToken);
+        if (settlements.Count == 0)
+        {
+            return Result.Failure<PdfFile>(PayrollErrors.NotFound);
+        }
+
+        var content = _pdfRenderer.RenderCompanyMonthly(scope.Value.CompanyName, month, settlements);
+        return Result.Success(new PdfFile(content, $"nomina-{month}.pdf"));
+    }
+
+    public async Task<Result<PdfFile>> GetCompanyTerminationPdfAsync(Guid adminUserId, string settlementId, CancellationToken cancellationToken = default)
+    {
+        var company = await GetAdminCompanyAsync(adminUserId, cancellationToken);
+        if (company == null)
+        {
+            return Result.Failure<PdfFile>(EmployeeErrors.CompanyNotAssigned);
+        }
+
+        if (!ObjectId.TryParse(settlementId, out _))
+        {
+            return Result.Failure<PdfFile>(PayrollErrors.NotFound);
+        }
+
+        // Filtrar por empresa del admin: RRHH no ve cortes de otras empresas.
+        var settlement = await _settlements
+            .Find(s => s.Id == settlementId && s.CompanyId == company.Id && s.Type == SettlementType.Termination)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (settlement == null)
+        {
+            return Result.Failure<PdfFile>(PayrollErrors.NotFound);
+        }
+
+        var content = _pdfRenderer.RenderCompanyTermination(company.Name, settlement);
+        return Result.Success(new PdfFile(content, $"liquidacion-{settlement.EmployeeDocument}-{settlement.PeriodEnd}.pdf"));
+    }
+
+    public async Task<Result<CompanyUsageDto>> GetCompanyUsageAsync(Guid adminUserId, string month, CancellationToken cancellationToken = default)
+    {
+        var scope = await GetCompanyScopeAsync(adminUserId, month, cancellationToken);
+        if (scope.IsFailure)
+        {
+            return Result.Failure<CompanyUsageDto>(scope.Error);
+        }
+
+        var orders = await GetChargeableOrdersAsync(
+            Builders<EmployeeOrder>.Filter.Eq(o => o.CompanyId, scope.Value.CompanyId),
+            scope.Value.MonthStart,
+            scope.Value.MonthEnd,
+            cancellationToken);
+
+        return Result.Success(new CompanyUsageDto(
+            month,
+            orders.Select(o => o.EmployeeId).Distinct().Count(),
+            orders.Count,
+            orders.Sum(o => o.TotalAmount),
+            "USD"));
+    }
+
+    private sealed record CompanyRef(Guid Id, string Name);
+
+    private sealed record CompanyScope(Guid CompanyId, string CompanyName, DateOnly MonthStart, DateOnly MonthEnd);
+
+    private async Task<CompanyRef?> GetAdminCompanyAsync(Guid adminUserId, CancellationToken cancellationToken)
+    {
+        return await _context.Users
+            .AsNoTracking()
+            .Where(u => u.Id == adminUserId && u.Company != null)
+            .Select(u => new CompanyRef(u.Company!.Id, u.Company.TradeName))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    private async Task<Result<CompanyScope>> GetCompanyScopeAsync(Guid adminUserId, string month, CancellationToken cancellationToken)
+    {
+        if (!DateOnly.TryParseExact(month + "-01", SettlementRules.DateFormat, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var monthStart))
+        {
+            return Result.Failure<CompanyScope>(PayrollErrors.InvalidMonth);
+        }
+
+        var company = await GetAdminCompanyAsync(adminUserId, cancellationToken);
+        if (company == null)
+        {
+            return Result.Failure<CompanyScope>(EmployeeErrors.CompanyNotAssigned);
+        }
+
+        return Result.Success(new CompanyScope(company.Id, company.Name, monthStart, monthStart.AddMonths(1).AddDays(-1)));
+    }
+
+    private async Task<List<PayrollSettlement>> FindCompanySettlementsAsync(CompanyScope scope, SettlementType? type, CancellationToken cancellationToken)
+    {
+        var filter = Builders<PayrollSettlement>.Filter;
+        var conditions = new List<FilterDefinition<PayrollSettlement>>
+        {
+            filter.Eq(s => s.CompanyId, scope.CompanyId),
+            filter.Gte(s => s.PeriodStart, SettlementRules.Format(scope.MonthStart)),
+            filter.Lte(s => s.PeriodStart, SettlementRules.Format(scope.MonthEnd)),
+        };
+        if (type.HasValue)
+        {
+            conditions.Add(filter.Eq(s => s.Type, type.Value));
+        }
+
+        return await _settlements
+            .Find(filter.And(conditions))
+            .SortBy(s => s.EmployeeName)
+            .ToListAsync(cancellationToken);
+    }
+
     private sealed record EmployeeRef(Guid Id, string CompanyName);
 
     private async Task<EmployeeRef?> GetEmployeeAsync(Guid userId, CancellationToken cancellationToken)
