@@ -45,12 +45,14 @@ public class AdminCompaniesController : ControllerBase
 
     [HttpPatch("{companyId:guid}/status")]
     [EndpointSummary("Activate or deactivate a company")]
-    [EndpointDescription("A deactivated company can no longer sign in (HR admin and employees) nor order food. Its data is kept.")]
+    [EndpointDescription("A deactivated company can no longer sign in (HR admin and employees) nor order food. Its data is kept. Deactivating requires the current user password.")]
     [ProducesResponseType(typeof(ApiResponse<CompanyDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<CompanyDto>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<CompanyDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStatus(Guid companyId, [FromBody] UpdateCompanyStatusRequest request, CancellationToken cancellationToken)
     {
-        var result = await _companyService.UpdateStatusAsync(companyId, request, cancellationToken);
+        var userId = User.GetUserId();
+        var result = await _companyService.UpdateStatusAsync(companyId, request, userId, cancellationToken);
         return result.ToActionResult(this, "Company status updated successfully.");
     }
 }

@@ -12,4 +12,5 @@ public record CreateCompanyRequest(
     string AdminLastName,
     string AdminEmail,
     decimal? Latitude = null,
-    decimal? Longitude = null);
+    decimal? Longitude = null,
+    string? Logo = null);

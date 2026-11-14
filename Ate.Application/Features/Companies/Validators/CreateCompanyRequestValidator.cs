@@ -1,5 +1,6 @@
 using Ate.Application.Common.Validation;
 using Ate.Application.Features.Companies.DTOs;
+using Ate.Application.Features.Restaurants;
 using FluentValidation;
 
 namespace Ate.Application.Features.Companies.Validators;
@@ -48,6 +49,13 @@ public class CreateCompanyRequestValidator : AbstractValidator<CreateCompanyRequ
             .InclusiveBetween(-180m, 180m)
             .When(x => x.Longitude.HasValue)
             .WithMessage("La longitud debe estar entre -180 y 180.");
+
+        RuleFor(x => x.Logo)
+            .MaximumLength(RestaurantLogo.MaxLength)
+            .WithMessage("El logo es demasiado pesado. Usa una imagen más pequeña.")
+            .Must(RestaurantLogo.IsValidDataUrl)
+            .WithMessage("El logo debe ser una imagen PNG, WebP o JPG.")
+            .When(x => !string.IsNullOrEmpty(x.Logo));
 
         RuleFor(x => x.AdminDocumentNumber)
             .Cascade(CascadeMode.Stop)

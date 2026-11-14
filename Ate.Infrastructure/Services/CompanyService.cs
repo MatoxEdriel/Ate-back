@@ -92,12 +92,34 @@ public class CompanyService : ICompanyService, IScopedDependency
         return Result.Success(result);
     }
 
-    public async Task<Result<CompanyDto>> UpdateStatusAsync(Guid companyId, UpdateCompanyStatusRequest request, CancellationToken cancellationToken = default)
+    public async Task<Result<CompanyDto>> UpdateStatusAsync(Guid companyId, UpdateCompanyStatusRequest request, Guid? userId = null, CancellationToken cancellationToken = default)
     {
         var company = await _context.Companies.FirstOrDefaultAsync(c => c.Id == companyId, cancellationToken);
         if (company == null)
         {
             return Result.Failure<CompanyDto>(CompanyErrors.NotFound);
+        }
+
+        if (!request.IsActive)
+        {
+            if (string.IsNullOrWhiteSpace(request.CurrentPassword))
+            {
+                return Result.Failure<CompanyDto>(Error.Validation("Company.PasswordRequired", "Debes ingresar tu contraseña para desactivar la empresa."));
+            }
+
+            if (userId.HasValue)
+            {
+                var passwordHash = await _context.Users
+                    .AsNoTracking()
+                    .Where(u => u.Id == userId.Value)
+                    .Select(u => u.PasswordHash)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (string.IsNullOrEmpty(passwordHash) || !_passwordHasher.VerifyPassword(request.CurrentPassword, passwordHash))
+                {
+                    return Result.Failure<CompanyDto>(Error.Validation("Company.InvalidPassword", "La contraseña es incorrecta."));
+                }
+            }
         }
 
         company.IsActive = request.IsActive;
@@ -150,6 +172,7 @@ public class CompanyService : ICompanyService, IScopedDependency
             Email = NullIfBlank(request.Email)?.ToLowerInvariant(),
             Phone = NullIfBlank(request.Phone),
             Address = NullIfBlank(request.Address),
+            LogoUrl = string.IsNullOrEmpty(request.Logo) ? null : request.Logo,
             Latitude = request.Latitude,
             Longitude = request.Longitude,
             IsActive = true

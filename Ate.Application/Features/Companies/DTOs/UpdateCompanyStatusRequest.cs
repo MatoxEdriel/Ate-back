@@ -1,3 +1,3 @@
 namespace Ate.Application.Features.Companies.DTOs;
 
-public record UpdateCompanyStatusRequest(bool IsActive);
+public record UpdateCompanyStatusRequest(bool IsActive, string? CurrentPassword = null);
