@@ -29,6 +29,8 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
     private const int ResetTokenBytes = 32;
 
     private readonly IApplicationDbContext _context;
+
+    private readonly ISecurityEventLog _securityEvents;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IEmailQueue _emailQueue;
     private readonly IDateTimeProvider _dateTimeProvider;
@@ -49,8 +51,10 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
         IValidator<RequestPasswordRecoveryRequest> requestValidator,
         IValidator<VerifyPasswordRecoveryCodeRequest> verifyValidator,
         IValidator<ResetPasswordRequest> resetValidator,
-        ILogger<PasswordRecoveryService> logger)
+        ILogger<PasswordRecoveryService> logger,
+        ISecurityEventLog securityEvents)
     {
+        _securityEvents = securityEvents;
         _context = context;
         _passwordHasher = passwordHasher;
         _emailQueue = emailQueue;
@@ -104,6 +108,8 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
         {
             return Result.Success();
         }
+
+        await _securityEvents.RecordAsync(SecurityEventTypes.PasswordResetRequested, user.Id, SecurityEventOutcomes.Success, cancellationToken: cancellationToken);
 
         var fullName = user.Person != null ? $"{user.Person.FirstName} {user.Person.LastName}".Trim() : user.Email!;
         var requestedAt = _dateTimeProvider.ConvertToTimeZone(now).ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.InvariantCulture);
@@ -237,6 +243,7 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
             return Result.Failure(PasswordRecoveryErrors.InvalidResetToken);
         }
 
+        await _securityEvents.RecordAsync(SecurityEventTypes.PasswordResetCompleted, user.Id, SecurityEventOutcomes.Success, cancellationToken: cancellationToken);
         return Result.Success();
     }
 

@@ -14,6 +14,7 @@ namespace Ate.Infrastructure.Services;
 public class AuthService : IAuthService, IScopedDependency
 {
     private readonly IApplicationDbContext _context;
+    private readonly ISecurityEventLog _securityEvents;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenGenerator _jwtTokenGenerator;
     private readonly IDateTimeProvider _dateTimeProvider;
@@ -30,8 +31,10 @@ public class AuthService : IAuthService, IScopedDependency
         IValidator<LoginRequest> loginValidator,
         IValidator<ChangePasswordRequest> changePasswordValidator,
         ILoginAttemptLimiter loginAttemptLimiter,
-        IUserAccessValidator accessValidator)
+        IUserAccessValidator accessValidator,
+        ISecurityEventLog securityEvents)
     {
+        _securityEvents = securityEvents;
         _context = context;
         _passwordHasher = passwordHasher;
         _jwtTokenGenerator = jwtTokenGenerator;
@@ -60,6 +63,7 @@ public class AuthService : IAuthService, IScopedDependency
 
         if (await _loginAttemptLimiter.GetRetryAfterAsync(normalizedDocumentNumber, clientIp, cancellationToken) is { } retryAfter)
         {
+            await _securityEvents.RecordAsync(SecurityEventTypes.LoginBlocked, null, SecurityEventOutcomes.Failure, cancellationToken: cancellationToken);
             return Result.Failure<AuthSession>(AuthErrors.TooManyLoginAttempts(retryAfter));
         }
 
@@ -84,30 +88,27 @@ public class AuthService : IAuthService, IScopedDependency
         if (user == null || !hasUsableHash || !isValidPassword)
         {
             await _loginAttemptLimiter.RegisterFailureAsync(normalizedDocumentNumber, clientIp, cancellationToken);
+            await _securityEvents.RecordAsync(SecurityEventTypes.Login, user?.Id, SecurityEventOutcomes.Failure, "invalid_credentials", cancellationToken);
             return Result.Failure<AuthSession>(AuthErrors.InvalidCredentials);
         }
 
         await _loginAttemptLimiter.ResetAsync(normalizedDocumentNumber, clientIp, cancellationToken);
 
-        if (!user.IsActive)
+        var loginBlockedReason = !user.IsActive ? AuthErrors.UserInactive
+            : user.Company is { IsActive: false } ? AuthErrors.CompanyInactive
+            : user.MustChangePassword && user.TemporaryPasswordExpiresAt < _dateTimeProvider.UtcNow ? AuthErrors.TemporaryPasswordExpired
+            : (Error?)null;
+        if (loginBlockedReason is { } loginError)
         {
-            return Result.Failure<AuthSession>(AuthErrors.UserInactive);
-        }
-
-        if (user.Company is { IsActive: false })
-        {
-            return Result.Failure<AuthSession>(AuthErrors.CompanyInactive);
-        }
-
-        if (user.MustChangePassword && user.TemporaryPasswordExpiresAt < _dateTimeProvider.UtcNow)
-        {
-            return Result.Failure<AuthSession>(AuthErrors.TemporaryPasswordExpired);
+            await _securityEvents.RecordAsync(SecurityEventTypes.Login, user.Id, SecurityEventOutcomes.Failure, loginError.Code, cancellationToken);
+            return Result.Failure<AuthSession>(loginError);
         }
 
         // Also covers employees deactivated by HR and employees of a deactivated company.
         var accessError = await _accessValidator.ValidateAsync(user.Id, cancellationToken: cancellationToken);
         if (accessError is { } blocked)
         {
+            await _securityEvents.RecordAsync(SecurityEventTypes.Login, user.Id, SecurityEventOutcomes.Failure, blocked.Code, cancellationToken);
             return Result.Failure<AuthSession>(blocked);
         }
 
@@ -134,6 +135,7 @@ public class AuthService : IAuthService, IScopedDependency
         }
 
         await _context.SaveChangesAsync(cancellationToken);
+        await _securityEvents.RecordAsync(SecurityEventTypes.Login, user.Id, SecurityEventOutcomes.Success, cancellationToken: cancellationToken);
 
         var fullName = user.Person != null
             ? $"{user.Person.FirstName} {user.Person.LastName}".Trim()
@@ -200,6 +202,7 @@ public class AuthService : IAuthService, IScopedDependency
                  string.IsNullOrEmpty(user.PasswordHash) ||
                  !_passwordHasher.VerifyPassword(request.CurrentPassword, user.PasswordHash))
         {
+            await _securityEvents.RecordAsync(SecurityEventTypes.PasswordChanged, user.Id, SecurityEventOutcomes.Failure, "invalid_current_password", cancellationToken);
             return Result.Failure<AuthSession>(AuthErrors.InvalidCurrentPassword);
         }
 
@@ -228,6 +231,7 @@ public class AuthService : IAuthService, IScopedDependency
         _context.RefreshTokens.Add(refreshToken);
 
         await _context.SaveChangesAsync(cancellationToken);
+        await _securityEvents.RecordAsync(SecurityEventTypes.PasswordChanged, user.Id, SecurityEventOutcomes.Success, cancellationToken: cancellationToken);
 
         var fullName = user.Person != null
             ? $"{user.Person.FirstName} {user.Person.LastName}".Trim()
@@ -381,6 +385,7 @@ public class AuthService : IAuthService, IScopedDependency
                 // Reuso de un token ya usado o revocado: posible robo. Se cierran todas las sesiones.
                 await RevokeAllAsync(stored.UserId, RevocationReasons.Reuse, cancellationToken);
                 await _context.SaveChangesAsync(cancellationToken);
+                await _securityEvents.RecordAsync(SecurityEventTypes.RefreshReuse, stored.UserId, SecurityEventOutcomes.Failure, "all_sessions_revoked", cancellationToken);
                 return Result.Failure<AuthSession>(AuthErrors.InvalidToken);
             }
         }
@@ -441,6 +446,7 @@ public class AuthService : IAuthService, IScopedDependency
         {
             Revoke(stored, RevocationReasons.Logout);
             await _context.SaveChangesAsync(cancellationToken);
+            await _securityEvents.RecordAsync(SecurityEventTypes.Logout, stored.UserId, SecurityEventOutcomes.Success, cancellationToken: cancellationToken);
         }
     }
 

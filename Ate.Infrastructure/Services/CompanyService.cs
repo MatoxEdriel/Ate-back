@@ -17,6 +17,7 @@ namespace Ate.Infrastructure.Services;
 public class CompanyService : ICompanyService, IScopedDependency
 {
     private readonly IApplicationDbContext _context;
+    private readonly ISecurityEventLog _securityEvents;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IValidator<CreateCompanyRequest> _createValidator;
     private readonly IEmailService _emailService;
@@ -29,8 +30,10 @@ public class CompanyService : ICompanyService, IScopedDependency
         IValidator<CreateCompanyRequest> createValidator,
         IEmailService emailService,
         IOptions<SmtpOptions> smtpOptions,
-        ILogger<CompanyService> logger)
+        ILogger<CompanyService> logger,
+        ISecurityEventLog securityEvents)
     {
+        _securityEvents = securityEvents;
         _context = context;
         _passwordHasher = passwordHasher;
         _createValidator = createValidator;
@@ -125,6 +128,7 @@ public class CompanyService : ICompanyService, IScopedDependency
 
         company.IsActive = request.IsActive;
         await _context.SaveChangesAsync(cancellationToken);
+        await _securityEvents.RecordAsync(SecurityEventTypes.CompanyStatus, userId, SecurityEventOutcomes.Success, $"{company.Id}:{(company.IsActive ? "active" : "inactive")}", cancellationToken);
 
         var employeeCount = await _context.Employees.CountAsync(e => e.CompanyId == companyId, cancellationToken);
         return Result.Success(ToDto(company, employeeCount, null, null));

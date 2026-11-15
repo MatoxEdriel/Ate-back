@@ -301,6 +301,19 @@ CREATE TABLE IF NOT EXISTS login_attempt_windows (
     blocked_until TIMESTAMPTZ NULL
 );
 
+-- Auditoría de eventos de seguridad (ISO 27001 A.8.15). Sin contraseñas, tokens, cédulas ni correos.
+CREATE TABLE IF NOT EXISTS security_events (
+    id UUID PRIMARY KEY,
+    occurred_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    event_type VARCHAR(50) NOT NULL,
+    user_id UUID NULL,
+    outcome VARCHAR(20) NOT NULL,
+    ip VARCHAR(45) NULL,
+    detail VARCHAR(500) NULL
+);
+CREATE INDEX IF NOT EXISTS ix_security_events_type_time ON security_events (event_type, occurred_at);
+CREATE INDEX IF NOT EXISTS ix_security_events_user_time ON security_events (user_id, occurred_at);
+
 -- 7b. PASSWORD_RECOVERIES (código OTP para restablecer la contraseña)
 -- Solo se guardan hashes. El código vence en code_expires_at; al verificarlo se emite un
 -- token de un solo uso que vence en reset_token_expires_at.

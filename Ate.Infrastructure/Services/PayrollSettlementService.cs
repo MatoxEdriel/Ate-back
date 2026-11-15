@@ -1,3 +1,4 @@
+using Ate.Domain.Constants;
 using Ate.Application.Common.Constants;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Features.Payroll;
@@ -18,6 +19,8 @@ public class PayrollSettlementService : IPayrollSettlementService, IScopedDepend
         [EmployeeOrderStatus.Confirmed, EmployeeOrderStatus.Ready, EmployeeOrderStatus.Delivered];
 
     private readonly IMongoCollection<EmployeeOrder> _orders;
+
+    private readonly ISecurityEventLog _securityEvents;
     private readonly IMongoCollection<PayrollSettlement> _settlements;
     private readonly IMongoCollection<PayrollClose> _closes;
     private readonly IDateTimeProvider _dateTimeProvider;
@@ -28,8 +31,10 @@ public class PayrollSettlementService : IPayrollSettlementService, IScopedDepend
         IMongoDbContext mongoContext,
         IDateTimeProvider dateTimeProvider,
         IApplicationDbContext context,
-        IPayrollPdfRenderer pdfRenderer)
+        IPayrollPdfRenderer pdfRenderer,
+        ISecurityEventLog securityEvents)
     {
+        _securityEvents = securityEvents;
         _context = context;
         _pdfRenderer = pdfRenderer;
         _orders = mongoContext.GetCollection<EmployeeOrder>(MongoCollections.EmployeeOrders);
@@ -193,6 +198,7 @@ public class PayrollSettlementService : IPayrollSettlementService, IScopedDepend
             return Result.Failure<PdfFile>(PayrollErrors.NotFound);
         }
 
+        await _securityEvents.RecordAsync(SecurityEventTypes.PayrollPdf, userId, SecurityEventOutcomes.Success, $"employee:{settlement.Id}", cancellationToken);
         var content = _pdfRenderer.RenderEmployeeSettlement(settlement, employee.CompanyName);
         return Result.Success(new PdfFile(content, $"consumo-{settlement.PeriodStart}.pdf"));
     }
@@ -223,6 +229,7 @@ public class PayrollSettlementService : IPayrollSettlementService, IScopedDepend
             return Result.Failure<PdfFile>(PayrollErrors.NotFound);
         }
 
+        await _securityEvents.RecordAsync(SecurityEventTypes.PayrollPdf, adminUserId, SecurityEventOutcomes.Success, $"monthly:{month}", cancellationToken);
         var content = _pdfRenderer.RenderCompanyMonthly(scope.Value.CompanyName, month, settlements);
         return Result.Success(new PdfFile(content, $"nomina-{month}.pdf"));
     }
@@ -250,6 +257,7 @@ public class PayrollSettlementService : IPayrollSettlementService, IScopedDepend
             return Result.Failure<PdfFile>(PayrollErrors.NotFound);
         }
 
+        await _securityEvents.RecordAsync(SecurityEventTypes.PayrollPdf, adminUserId, SecurityEventOutcomes.Success, $"termination:{settlement.Id}", cancellationToken);
         var content = _pdfRenderer.RenderCompanyTermination(company.Name, settlement);
         return Result.Success(new PdfFile(content, $"liquidacion-{settlement.EmployeeDocument}-{settlement.PeriodEnd}.pdf"));
     }

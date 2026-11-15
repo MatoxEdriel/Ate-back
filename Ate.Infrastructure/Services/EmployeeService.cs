@@ -17,6 +17,7 @@ namespace Ate.Infrastructure.Services;
 public class EmployeeService : IEmployeeService, IScopedDependency
 {
     private readonly IApplicationDbContext _context;
+    private readonly ISecurityEventLog _securityEvents;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IValidator<CreateEmployeeRequest> _createValidator;
     private readonly IEmailService _emailService;
@@ -29,8 +30,10 @@ public class EmployeeService : IEmployeeService, IScopedDependency
         IValidator<CreateEmployeeRequest> createValidator,
         IEmailService emailService,
         IOptions<SmtpOptions> smtpOptions,
-        ILogger<EmployeeService> logger)
+        ILogger<EmployeeService> logger,
+        ISecurityEventLog securityEvents)
     {
+        _securityEvents = securityEvents;
         _context = context;
         _passwordHasher = passwordHasher;
         _createValidator = createValidator;
@@ -241,6 +244,7 @@ public class EmployeeService : IEmployeeService, IScopedDependency
 
         employee.Status = request.IsActive ? EmployeeStatus.Active : EmployeeStatus.Inactive;
         await _context.SaveChangesAsync(cancellationToken);
+        await _securityEvents.RecordAsync(SecurityEventTypes.EmployeeStatus, adminUserId, SecurityEventOutcomes.Success, $"{employee.Id}:{employee.Status}", cancellationToken);
 
         return Result.Success(ToDto(employee));
     }

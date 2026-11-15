@@ -13,4 +13,6 @@ public class CurrentUserService : ICurrentUserService
     }
 
     public Guid? UserId => _httpContextAccessor.HttpContext?.User?.GetUserId();
+
+    public string? IpAddress => _httpContextAccessor.HttpContext?.Connection.RemoteIpAddress?.ToString();
 }

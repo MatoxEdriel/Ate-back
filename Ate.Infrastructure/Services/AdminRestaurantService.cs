@@ -21,6 +21,8 @@ public class AdminRestaurantService : IAdminRestaurantService, IScopedDependency
     private const int MaxCodeBaseLength = 40;
 
     private readonly IApplicationDbContext _context;
+
+    private readonly ISecurityEventLog _securityEvents;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IValidator<CreateRestaurantRequest> _createValidator;
     private readonly IEmailService _emailService;
@@ -33,8 +35,10 @@ public class AdminRestaurantService : IAdminRestaurantService, IScopedDependency
         IValidator<CreateRestaurantRequest> createValidator,
         IEmailService emailService,
         IOptions<SmtpOptions> smtpOptions,
-        ILogger<AdminRestaurantService> logger)
+        ILogger<AdminRestaurantService> logger,
+        ISecurityEventLog securityEvents)
     {
+        _securityEvents = securityEvents;
         _context = context;
         _passwordHasher = passwordHasher;
         _createValidator = createValidator;
@@ -217,6 +221,7 @@ public class AdminRestaurantService : IAdminRestaurantService, IScopedDependency
 
         restaurant.IsActive = request.IsActive;
         await _context.SaveChangesAsync(cancellationToken);
+        await _securityEvents.RecordAsync(SecurityEventTypes.RestaurantStatus, userId, SecurityEventOutcomes.Success, $"{restaurant.Id}:{(restaurant.IsActive ? "active" : "inactive")}", cancellationToken);
 
         var agreements = await _context.CompanyRestaurantAgreements
             .CountAsync(a => a.RestaurantId == restaurantId && a.IsActive, cancellationToken);
