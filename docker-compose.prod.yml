@@ -1,0 +1,53 @@
+# Producción. Uso: docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+# - La API corre en Production: sin dev-token, sin documentación y sin seed de cuentas de ejemplo.
+# - PostgreSQL y Mongo NO publican puertos: solo la API los alcanza por la red interna.
+# - Todos los secretos llegan por variables (.env.prod o el gestor de secretos de la plataforma).
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: ate_db
+      POSTGRES_USER: ${POSTGRES_OWNER_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_OWNER_PASSWORD:?Define POSTGRES_OWNER_PASSWORD}
+    volumes:
+      - ./database/01_init_schema.sql:/docker-entrypoint-initdb.d/01_init_schema.sql:ro
+      - postgres_ate_data:/var/lib/postgresql/data
+
+  mongo:
+    image: mongo:8.0
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-ate_root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Define MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ate_nosql_db
+    volumes:
+      - mongo_ate_data:/data/db
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      # Solo hacia el proxy (nginx/balanceador) de la misma máquina.
+      - "127.0.0.1:5252:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - AllowedHosts=${API_ALLOWED_HOSTS:?Define API_ALLOWED_HOSTS (ej. api.ate.com)}
+      - Cors__AllowedOrigins__0=${FRONTEND_ORIGIN:?Define FRONTEND_ORIGIN (ej. https://app.ate.com)}
+      - JwtSettings__SecretKey=${JWT_SECRET_KEY:?Define JWT_SECRET_KEY (32+ bytes aleatorios)}
+      # La API usa un usuario con mínimo privilegio (database/03_app_role.sql, database/mongo/create-app-user.js).
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=ate_db;Username=ate_app;Password=${POSTGRES_APP_PASSWORD:?Define POSTGRES_APP_PASSWORD}
+      - ConnectionStrings__MongoDbConnection=mongodb://ate_app:${MONGO_APP_PASSWORD:?Define MONGO_APP_PASSWORD}@mongo:27017/ate_nosql_db?authSource=ate_nosql_db
+      - SmtpSettings__Password=${SMTP_PASSWORD:-}
+      - Security__EnforceHttps=true
+      # Red interna de Docker donde vive el proxy que agrega X-Forwarded-For / X-Forwarded-Proto.
+      - ForwardedHeaders__KnownNetworks__0=${PROXY_NETWORK:-172.16.0.0/12}
+    depends_on:
+      - postgres
+      - mongo
+
+volumes:
+  postgres_ate_data:
+  mongo_ate_data:

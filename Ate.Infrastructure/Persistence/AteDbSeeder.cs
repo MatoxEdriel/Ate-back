@@ -26,16 +26,17 @@ public static partial class AteDbSeeder
         ("Ricardo", "Espinoza Guerrero", "0957901234", "ricardo.espinoza@acme.com", "EMP-015", "Operaciones", 105m, true, true)
     ];
 
-    public static async Task SeedAsync(AteDbContext context, IPasswordHasher passwordHasher)
+    /// <param name="defaultPassword">Contraseña de las cuentas de ejemplo (Seed:DefaultPassword); nunca escrita en el código.</param>
+    public static async Task SeedAsync(AteDbContext context, IPasswordHasher passwordHasher, string defaultPassword)
     {
         await SeedRolesAsync(context);
         var company = await SeedDefaultCompanyAsync(context);
         var departments = await SeedDepartmentsAsync(context, company);
-        await SeedCompanyAdminAsync(context, passwordHasher, company);
-        await SeedSuperAdminAsync(context, passwordHasher);
-        await SeedDefaultEmployeeAsync(context, passwordHasher, company, departments);
-        await SeedMerchantAsync(context, passwordHasher);
-        await SeedSampleEmployeesAsync(context, passwordHasher, company, departments);
+        await SeedCompanyAdminAsync(context, passwordHasher, defaultPassword, company);
+        await SeedSuperAdminAsync(context, passwordHasher, defaultPassword);
+        await SeedDefaultEmployeeAsync(context, passwordHasher, defaultPassword, company, departments);
+        await SeedMerchantAsync(context, passwordHasher, defaultPassword);
+        await SeedSampleEmployeesAsync(context, passwordHasher, defaultPassword, company, departments);
         await SeedRestaurantsAsync(context, company);
     }
 
@@ -104,7 +105,7 @@ public static partial class AteDbSeeder
         await context.SaveChangesAsync();
     }
 
-    private static async Task SeedCompanyAdminAsync(AteDbContext context, IPasswordHasher passwordHasher, Company company)
+    private static async Task SeedCompanyAdminAsync(AteDbContext context, IPasswordHasher passwordHasher, string defaultPassword, Company company)
     {
         const string adminEmail = "admin@ate.com";
         const string adminDocumentNumber = "0943676155";
@@ -145,7 +146,7 @@ public static partial class AteDbSeeder
         {
             Id = Guid.CreateVersion7(),
             Email = adminEmail,
-            PasswordHash = passwordHasher.HashPassword("Admin123*Ate"),
+            PasswordHash = passwordHasher.HashPassword(defaultPassword),
             IsActive = true,
             EmailConfirmed = true,
             MustChangePassword = false,
@@ -176,7 +177,7 @@ public static partial class AteDbSeeder
         await context.SaveChangesAsync();
     }
 
-    private static async Task SeedSuperAdminAsync(AteDbContext context, IPasswordHasher passwordHasher)
+    private static async Task SeedSuperAdminAsync(AteDbContext context, IPasswordHasher passwordHasher, string defaultPassword)
     {
         const string superAdminEmail = "superadmin@ate.com";
         const string superAdminDocumentNumber = "0943676157";
@@ -204,7 +205,7 @@ public static partial class AteDbSeeder
         {
             Id = Guid.CreateVersion7(),
             Email = superAdminEmail,
-            PasswordHash = passwordHasher.HashPassword("Admin123*Ate"),
+            PasswordHash = passwordHasher.HashPassword(defaultPassword),
             IsActive = true,
             EmailConfirmed = true,
             MustChangePassword = false
@@ -234,7 +235,7 @@ public static partial class AteDbSeeder
         await context.SaveChangesAsync();
     }
 
-    private static async Task SeedDefaultEmployeeAsync(AteDbContext context, IPasswordHasher passwordHasher, Company company, IReadOnlyDictionary<string, Guid> departments)
+    private static async Task SeedDefaultEmployeeAsync(AteDbContext context, IPasswordHasher passwordHasher, string defaultPassword, Company company, IReadOnlyDictionary<string, Guid> departments)
     {
         const string employeeEmail = "empleado@ate.com";
         const string employeeDocumentNumber = "0943676156";
@@ -262,7 +263,7 @@ public static partial class AteDbSeeder
         {
             Id = Guid.CreateVersion7(),
             Email = employeeEmail,
-            PasswordHash = passwordHasher.HashPassword("Admin123*Ate"),
+            PasswordHash = passwordHasher.HashPassword(defaultPassword),
             IsActive = true,
             EmailConfirmed = true,
             MustChangePassword = false
@@ -330,7 +331,7 @@ public static partial class AteDbSeeder
         return existing;
     }
 
-    private static async Task SeedMerchantAsync(AteDbContext context, IPasswordHasher passwordHasher)
+    private static async Task SeedMerchantAsync(AteDbContext context, IPasswordHasher passwordHasher, string defaultPassword)
     {
         const string merchantEmail = "comercio@ate.com";
         const string merchantDocumentNumber = "0943676158";
@@ -358,7 +359,7 @@ public static partial class AteDbSeeder
         {
             Id = Guid.CreateVersion7(),
             Email = merchantEmail,
-            PasswordHash = passwordHasher.HashPassword("Admin123*Ate"),
+            PasswordHash = passwordHasher.HashPassword(defaultPassword),
             IsActive = true,
             EmailConfirmed = true,
             MustChangePassword = false
@@ -388,7 +389,7 @@ public static partial class AteDbSeeder
         await context.SaveChangesAsync();
     }
 
-    private static async Task SeedSampleEmployeesAsync(AteDbContext context, IPasswordHasher passwordHasher, Company company, IReadOnlyDictionary<string, Guid> departments)
+    private static async Task SeedSampleEmployeesAsync(AteDbContext context, IPasswordHasher passwordHasher, string defaultPassword, Company company, IReadOnlyDictionary<string, Guid> departments)
     {
         var documentNumbers = SampleEmployees.Select(s => s.DocumentNumber).ToList();
         var existingDocuments = await context.Persons
@@ -425,7 +426,7 @@ public static partial class AteDbSeeder
             return;
         }
 
-        var passwordHash = passwordHasher.HashPassword("Admin123*Ate");
+        var passwordHash = passwordHasher.HashPassword(defaultPassword);
 
         foreach (var sample in pending)
         {

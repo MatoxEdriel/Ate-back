@@ -17,17 +17,27 @@ try
         .ReadFrom.Services(services)
         .Enrich.FromLogContext());
 
+    // Orígenes permitidos desde configuración (Cors:AllowedOrigins); fuera de Development no hay valor por defecto.
     const string corsPolicyName = "FrontendCorsPolicy";
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
+    if (allowedOrigins.Length == 0 && !builder.Environment.IsDevelopment())
+    {
+        throw new InvalidOperationException("Cors:AllowedOrigins must list the frontend origins outside Development.");
+    }
+
     builder.Services.AddCors(options =>
     {
         options.AddPolicy(corsPolicyName, policy =>
         {
-            policy.WithOrigins("http://localhost:4200", "http://localhost:3000")
+            policy.WithOrigins(allowedOrigins)
                   .AllowAnyHeader()
                   .AllowAnyMethod()
                   .AllowCredentials();
         });
     });
+
+    // Límite de tamaño de las peticiones (el logo en base64 es lo más pesado: ~300 KB).
+    builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 2 * 1024 * 1024);
 
     builder.Services.AddControllers(options =>
         options.Filters.Add<Ate.Api.Filters.PasswordChangeRequiredFilter>());
@@ -52,7 +62,7 @@ try
 
     app.MapControllers();
 
-    app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy", version = "1.0.3", timestamp = DateTimeOffset.UtcNow }))
+    app.MapGet("/api/health", () => Results.Ok(new { status = "Healthy", timestamp = DateTimeOffset.UtcNow }))
        .WithName("HealthCheck")
        .WithTags("System Health")
        .WithSummary("System health check")

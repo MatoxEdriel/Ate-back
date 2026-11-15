@@ -14,7 +14,8 @@ This directory will contain the SQL scripts for the Ate database.
   * Default SuperAdmin user:
     * **Email:** `admin@ate.com`
     * **Document:** `0943676155`
-    * **Password:** `Admin123*Ate` (PBKDF2 SHA-256)
+    * **Password:** no se documenta. Las cuentas de ejemplo usan `Seed:DefaultPassword` (user-secrets o `.env`); si no está definido, la API genera una al arrancar y la muestra una vez en el log.
+  * **Solo desarrollo:** `02_seed_data.sql` nunca se ejecuta en producción.
   * SuperAdmin person profile and role assignment.
 
 ---

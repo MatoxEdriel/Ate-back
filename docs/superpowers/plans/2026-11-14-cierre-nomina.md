@@ -178,7 +178,7 @@ git commit -m "feat(payroll): settlement generation service and monthly close wo
 
 - [ ] **Step 3: Manual check**
 
-Log in as `empleado@ate.com` (`0943676156` / `Admin123*Ate`): `GET /api/v1/employee/settlements/current` → 200 with `lines`. `GET .../settlements/{id-of-another-employee}/pdf` → 404. Open a downloaded PDF and confirm it shows the order detail.
+Log in as `empleado@ate.com` (`0943676156` / la contraseña de `Seed:DefaultPassword`): `GET /api/v1/employee/settlements/current` → 200 with `lines`. `GET .../settlements/{id-of-another-employee}/pdf` → 404. Open a downloaded PDF and confirm it shows the order detail.
 
 - [ ] **Step 4: Commit**
 
@@ -210,7 +210,7 @@ git commit -m "feat(payroll): employee settlements API and PDF rendering"
 
 - [ ] **Step 3: Manual check (Review Focus 4)**
 
-As HR (`0943676155` / `Admin123*Ate`):
+As HR (`0943676155` / la contraseña de `Seed:DefaultPassword`):
 - `GET /api/v1/company/settlements?month=2026-10` → 200, with no `lines` key in the JSON.
 - `GET /api/v1/company/employees/{id}/orders` → 404.
 - `GET .../settlements/{id-from-another-company}/pdf` → 404.

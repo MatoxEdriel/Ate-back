@@ -1,5 +1,6 @@
 using Ate.Application.Common.Interfaces;
 using Ate.Infrastructure.Persistence;
+using Ate.Infrastructure.Services;
 using Ate.Infrastructure.Persistence.MongoDb;
 using MongoDB.Driver;
 using Npgsql;
@@ -41,7 +42,16 @@ public static class DatabaseExtensions
 
         try
         {
-            await AteDbSeeder.SeedAsync(context, passwordHasher);
+            // Las cuentas de ejemplo usan Seed:DefaultPassword (user-secrets / .env). Si no está, se genera una
+            // contraseña aleatoria y se avisa una vez: nunca hay una contraseña fija en el código.
+            var seedPassword = app.Configuration["Seed:DefaultPassword"];
+            if (string.IsNullOrWhiteSpace(seedPassword))
+            {
+                seedPassword = TemporaryPasswordGenerator.Generate();
+                logger.LogWarning("Seed:DefaultPassword is not set. New sample accounts will use this generated password: {SeedPassword}", seedPassword);
+            }
+
+            await AteDbSeeder.SeedAsync(context, passwordHasher, seedPassword);
         }
         catch (Exception ex)
         {

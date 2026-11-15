@@ -1,3 +1,5 @@
+-- DEVELOPMENT ONLY: this seed creates sample accounts with a shared password. Never run it in production
+-- (docker-compose.prod.yml does not mount it). The application seeder uses Seed:DefaultPassword instead.
 -- =============================================================================
 -- Ate Platform - Seed Data Script
 -- Purpose: Initial catalog roles, CompanyAdmin, SuperAdmin and Employee accounts.
@@ -20,7 +22,7 @@ SELECT setval(pg_get_serial_sequence('roles', 'id'), COALESCE(MAX(id), 1)) FROM 
 -- Default Credentials:
 --   Identifier / Email: admin@ate.com
 --   Identifier / Document: 0943676155
---   Password: Admin123*Ate (PBKDF2 SHA-256 with 100,000 iterations)
+--   Password: not documented here (development-only script; never mounted in production)
 INSERT INTO users (
     id,
     email,
@@ -88,7 +90,7 @@ WHERE user_id = '01928000-0000-7000-8000-000000000001' AND role_id = 1;
 -- Default Credentials:
 --   Identifier / Email: superadmin@ate.com
 --   Identifier / Document: 0999999999
---   Password: Admin123*Ate
+--   Password: not documented here (development-only script)
 INSERT INTO users (
     id,
     email,
@@ -198,7 +200,7 @@ ON CONFLICT DO NOTHING;
 -- Default Credentials:
 --   Identifier / Email: empleado@ate.com
 --   Identifier / Document: 0912345678
---   Password: Admin123*Ate
+--   Password: not documented here (development-only script)
 INSERT INTO users (
     id,
     email,
@@ -299,7 +301,7 @@ WHERE id = '01928000-0000-7000-8000-000000000032' AND monthly_allowance = 0;
 -- Default Credentials:
 --   Identifier / Email: comercio@ate.com
 --   Identifier / Document: 0943676158
---   Password: Admin123*Ate
+--   Password: not documented here (development-only script)
 INSERT INTO users (
     id,
     email,
@@ -361,7 +363,7 @@ VALUES (
 ON CONFLICT (user_id, role_id) DO NOTHING;
 
 -- 8. SAMPLE EMPLOYEES FOR ACME (Development demo data)
---   Password for all sample accounts: Admin123*Ate
+--   Password for all sample accounts: not documented here (development-only script)
 INSERT INTO users (id, email, password_hash, is_active, email_confirmed, must_change_password, created_at, is_deleted)
 VALUES
     ('01928000-0000-7000-8000-000000000106', 'maria.cevallos@acme.com', '735zKhX+F8ep7goJoiIsrwyQv5wzp5GQOgbzwK7yH/tNCOCsLNWyWmwJUcKiRPzY', TRUE, TRUE, FALSE, CURRENT_TIMESTAMP - INTERVAL '60 days', FALSE),

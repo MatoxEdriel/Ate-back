@@ -2,7 +2,7 @@ using System.Security.Cryptography;
 
 namespace Ate.Infrastructure.Services;
 
-internal static class TemporaryPasswordGenerator
+public static class TemporaryPasswordGenerator
 {
     private const int Length = 12;
     private const string UpperChars = "ABCDEFGHJKLMNPQRSTUVWXYZ";
