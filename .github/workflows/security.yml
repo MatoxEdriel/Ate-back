@@ -1,0 +1,56 @@
+# Análisis de seguridad en cada push y PR: secretos, código y dependencias vulnerables.
+name: Security
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  secrets:
+    name: Secretos (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    name: Código (CodeQL)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: csharp
+          build-mode: manual
+      - run: dotnet build Ate.slnx -c Release
+      - uses: github/codeql-action/analyze@v3
+
+  dependencies:
+    name: Dependencias vulnerables
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - run: dotnet restore Ate.slnx
+      - name: Fallar si hay paquetes vulnerables
+        run: |
+          dotnet list Ate.slnx package --vulnerable --include-transitive | tee vulnerable.txt
+          if grep -q ">" vulnerable.txt; then echo "Hay paquetes con vulnerabilidades conocidas"; exit 1; fi
+      - name: Tests de nómina
+        run: dotnet test Ate.Tests

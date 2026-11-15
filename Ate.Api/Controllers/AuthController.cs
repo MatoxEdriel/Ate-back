@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.RateLimiting;
 namespace Ate.Api.Controllers;
 
 [ApiController]
-[Route("api/v1/[controller]")]
+[Route("api/v1/auth")]
 [Produces("application/json")]
 [Tags("Authentication")]
 public class AuthController : ControllerBase
