@@ -1,3 +1,4 @@
+using Ate.Domain.Constants;
 using System.Text;
 using Ate.Api.Extensions;
 using Ate.Api.Middlewares;
@@ -67,7 +68,9 @@ public static class DependencyInjection
                         return;
                     }
 
-                    var error = await GetAccessErrorAsync(context.HttpContext, userId.Value);
+                    // Un token sin sello (emitido antes de existir) se trata como inválido.
+                    var stamp = context.Principal?.FindFirst(CustomClaimTypes.SecurityStamp)?.Value ?? string.Empty;
+                    var error = await GetAccessErrorAsync(context.HttpContext, userId.Value, stamp);
                     if (error is { } blocked)
                     {
                         context.HttpContext.Items[AccessErrorItemKey] = blocked;
@@ -152,17 +155,17 @@ public static class DependencyInjection
 
     private sealed record AccessCheck(Error? Error);
 
-    private static async Task<Error?> GetAccessErrorAsync(HttpContext httpContext, Guid userId)
+    private static async Task<Error?> GetAccessErrorAsync(HttpContext httpContext, Guid userId, string securityStamp)
     {
         var cache = httpContext.RequestServices.GetRequiredService<IMemoryCache>();
-        var cacheKey = $"user-access:{userId}";
+        var cacheKey = $"user-access:{userId}:{securityStamp}";
         if (cache.TryGetValue(cacheKey, out AccessCheck? cached) && cached != null)
         {
             return cached.Error;
         }
 
         var validator = httpContext.RequestServices.GetRequiredService<IUserAccessValidator>();
-        var error = await validator.ValidateAsync(userId, httpContext.RequestAborted);
+        var error = await validator.ValidateAsync(userId, securityStamp, httpContext.RequestAborted);
         cache.Set(cacheKey, new AccessCheck(error), AccessCheckCacheDuration);
         return error;
     }

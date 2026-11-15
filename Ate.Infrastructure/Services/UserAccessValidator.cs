@@ -16,7 +16,7 @@ public class UserAccessValidator : IUserAccessValidator, IScopedDependency
         _context = context;
     }
 
-    public async Task<Error?> ValidateAsync(Guid userId, CancellationToken cancellationToken = default)
+    public async Task<Error?> ValidateAsync(Guid userId, string? securityStamp = null, CancellationToken cancellationToken = default)
     {
         var user = await _context.Users
             .AsNoTracking()
@@ -24,6 +24,7 @@ public class UserAccessValidator : IUserAccessValidator, IScopedDependency
             .Select(u => new
             {
                 u.IsActive,
+                u.SecurityStamp,
                 CompanyIsActive = u.Company != null ? (bool?)u.Company.IsActive : null,
                 PersonId = u.Person != null ? (Guid?)u.Person.Id : null,
                 IsEmployee = u.UserRoles.Any(ur => ur.Role.Name == RoleConstants.Employee),
@@ -31,6 +32,11 @@ public class UserAccessValidator : IUserAccessValidator, IScopedDependency
             .FirstOrDefaultAsync(cancellationToken);
 
         if (user == null)
+        {
+            return AuthErrors.InvalidToken;
+        }
+
+        if (securityStamp != null && !string.Equals(securityStamp, user.SecurityStamp, StringComparison.Ordinal))
         {
             return AuthErrors.InvalidToken;
         }

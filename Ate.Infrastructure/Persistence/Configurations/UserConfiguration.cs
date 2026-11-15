@@ -30,6 +30,10 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(u => u.SecurityStamp)
+            .HasMaxLength(64)
+            .IsRequired();
+
         builder.Property(u => u.TemporaryPasswordExpiresAt);
 
         builder.Property(u => u.MustChangePassword)

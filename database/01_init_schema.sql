@@ -117,6 +117,8 @@ END $$;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id UUID NULL;
 -- Contraseña temporal: vence a las 72 h (null cuando la eligió el usuario).
 ALTER TABLE users ADD COLUMN IF NOT EXISTS temporary_password_expires_at TIMESTAMPTZ NULL;
+-- Sello de seguridad: cambia con la contraseña e invalida los tokens anteriores.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS security_stamp VARCHAR(64) NOT NULL DEFAULT replace(gen_random_uuid()::text, '-', '');
 
 DO $$
 BEGIN

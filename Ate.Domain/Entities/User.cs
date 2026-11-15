@@ -12,6 +12,8 @@ public class User : BaseAuditableEntity
     /// <summary>Vencimiento de la contraseña temporal; null cuando la contraseña la eligió el usuario.</summary>
     public DateTimeOffset? TemporaryPasswordExpiresAt { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
+    /// <summary>Cambia con cada cambio de contraseña; los tokens con un sello anterior dejan de valer.</summary>
+    public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
     public Guid? CompanyId { get; set; }
 
     public Company? Company { get; set; }

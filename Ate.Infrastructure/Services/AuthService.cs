@@ -104,7 +104,7 @@ public class AuthService : IAuthService, IScopedDependency
         }
 
         // Also covers employees deactivated by HR and employees of a deactivated company.
-        var accessError = await _accessValidator.ValidateAsync(user.Id, cancellationToken);
+        var accessError = await _accessValidator.ValidateAsync(user.Id, cancellationToken: cancellationToken);
         if (accessError is { } blocked)
         {
             return Result.Failure<LoginResponse>(blocked);
@@ -193,7 +193,7 @@ public class AuthService : IAuthService, IScopedDependency
         }
 
         // Also covers employees deactivated by HR and employees of a deactivated company.
-        var accessError = await _accessValidator.ValidateAsync(user.Id, cancellationToken);
+        var accessError = await _accessValidator.ValidateAsync(user.Id, cancellationToken: cancellationToken);
         if (accessError is { } blocked)
         {
             return Result.Failure<LoginResponse>(blocked);
@@ -217,6 +217,7 @@ public class AuthService : IAuthService, IScopedDependency
         user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
         user.MustChangePassword = false;
         user.TemporaryPasswordExpiresAt = null;
+        user.SecurityStamp = Guid.NewGuid().ToString("N");
 
         var activeTokens = await _context.RefreshTokens
             .Where(t => t.UserId == user.Id && !t.IsRevoked)
@@ -260,6 +261,35 @@ public class AuthService : IAuthService, IScopedDependency
             user.MustChangePassword);
 
         return Result.Success(new LoginResponse(accessToken, refreshTokenString, expiresAt, userDto));
+    }
+
+    public async Task<Result<CurrentUserDto>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var user = await _context.Users
+            .AsNoTracking()
+            .Where(u => u.Id == userId && !u.IsDeleted)
+            .Select(u => new
+            {
+                u.Id,
+                u.Email,
+                FirstName = u.Person != null ? u.Person.FirstName : string.Empty,
+                LastName = u.Person != null ? u.Person.LastName : string.Empty,
+                DocumentNumber = u.Person != null ? u.Person.DocumentNumber : string.Empty,
+                Roles = u.UserRoles.Select(ur => ur.Role.Name).ToList(),
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (user == null)
+        {
+            return Result.Failure<CurrentUserDto>(AuthErrors.InvalidToken);
+        }
+
+        return Result.Success(new CurrentUserDto(
+            user.Id,
+            user.Email ?? string.Empty,
+            $"{user.FirstName} {user.LastName}".Trim(),
+            user.DocumentNumber,
+            user.Roles));
     }
 
     public async Task<Result<LoginResponse>> GenerateDevTokenAsync(DevTokenRequest? request = null, CancellationToken cancellationToken = default)

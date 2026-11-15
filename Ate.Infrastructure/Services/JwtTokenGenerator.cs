@@ -45,13 +45,11 @@ public class JwtTokenGenerator : IJwtTokenGenerator, ISingletonDependency
                 claims.Add(new Claim(ClaimTypes.Name, fullName));
             }
 
-            if (!string.IsNullOrWhiteSpace(user.Person.DocumentNumber))
-            {
-                claims.Add(new Claim(CustomClaimTypes.DocumentNumber, user.Person.DocumentNumber));
-            }
-
             claims.Add(new Claim(CustomClaimTypes.PersonId, user.Person.Id.ToString()));
         }
+
+        // La cédula no va en el token: cualquiera que lo tenga podría leerla.
+        claims.Add(new Claim(CustomClaimTypes.SecurityStamp, user.SecurityStamp));
 
         foreach (var role in roles)
         {

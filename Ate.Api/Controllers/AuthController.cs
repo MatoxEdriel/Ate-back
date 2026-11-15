@@ -45,10 +45,10 @@ public class AuthController : ControllerBase
     [Authorize]
     [AllowWhilePasswordChangeRequired]
     [EndpointSummary("Get current authenticated user profile")]
-    [EndpointDescription("Returns the identity of the signed-in user, read from the validated JWT claims. Allowed while a temporary password change is pending.")]
+    [EndpointDescription("Returns the identity of the signed-in user, read from the database (the ID number is not carried in the token). Allowed while a temporary password change is pending.")]
     [ProducesResponseType(typeof(ApiResponse<CurrentUserDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<CurrentUserDto>), StatusCodes.Status401Unauthorized)]
-    public IActionResult GetCurrentUser()
+    public async Task<IActionResult> GetCurrentUser(CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (!userId.HasValue)
@@ -56,14 +56,8 @@ public class AuthController : ControllerBase
             return ResultExtensions.ToErrorActionResult<CurrentUserDto>(AuthErrors.InvalidToken, this);
         }
 
-        var profile = new CurrentUserDto(
-            userId.Value,
-            User.GetEmail(),
-            User.GetFullName(),
-            User.GetDocumentNumber(),
-            User.GetRoles());
-
-        return Ok(ApiResponse<CurrentUserDto>.SuccessResponse(profile, "User profile retrieved successfully."));
+        var result = await _authService.GetCurrentUserAsync(userId.Value, cancellationToken);
+        return result.ToActionResult(this, "User profile retrieved successfully.");
     }
 
     [HttpPost("change-password")]

@@ -15,5 +15,7 @@ public interface IAuthService
     /// revokes every other session and returns a fresh session without the change requirement.
     /// </summary>
     Task<Result<LoginResponse>> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken = default);
+    /// <summary>Identidad del usuario conectado, leída de la base (la cédula ya no viaja en el token).</summary>
+    Task<Result<CurrentUserDto>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default);
     Task<Result<LoginResponse>> GenerateDevTokenAsync(DevTokenRequest? request = null, CancellationToken cancellationToken = default);
 }

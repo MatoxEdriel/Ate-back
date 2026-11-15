@@ -11,5 +11,6 @@ namespace Ate.Application.Common.Interfaces;
 public interface IUserAccessValidator
 {
     /// <returns>null when the account may continue; otherwise the reason it was blocked.</returns>
-    Task<Error?> ValidateAsync(Guid userId, CancellationToken cancellationToken = default);
+    /// <param name="securityStamp">Sello del token; si se pasa y no coincide con el del usuario, el token es inválido.</param>
+    Task<Error?> ValidateAsync(Guid userId, string? securityStamp = null, CancellationToken cancellationToken = default);
 }
