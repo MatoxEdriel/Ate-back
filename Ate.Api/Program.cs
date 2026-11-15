@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.HttpOverrides;
 using Ate.Api;
 using Ate.Api.Extensions;
 using Ate.Application;
@@ -45,9 +46,53 @@ try
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
 
+    // IP real y esquema detrás del proxy: solo se confía en las redes/proxies configurados.
+    var knownNetworks = builder.Configuration.GetSection("ForwardedHeaders:KnownNetworks").Get<string[]>() ?? [];
+    var knownProxies = builder.Configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>() ?? [];
+    var useForwardedHeaders = knownNetworks.Length > 0 || knownProxies.Length > 0;
+    if (useForwardedHeaders)
+    {
+        builder.Services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            options.KnownIPNetworks.Clear();
+            options.KnownProxies.Clear();
+            foreach (var network in knownNetworks)
+            {
+                options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
+            }
+            foreach (var proxy in knownProxies)
+            {
+                options.KnownProxies.Add(System.Net.IPAddress.Parse(proxy));
+            }
+        });
+    }
+
+    var enforceHttps = builder.Configuration.GetValue<bool>("Security:EnforceHttps");
+
     var app = builder.Build();
 
-    app.UseSerilogRequestLogging();
+    if (useForwardedHeaders)
+    {
+        app.UseForwardedHeaders();
+    }
+
+    app.UseMiddleware<Ate.Api.Middlewares.SecurityHeadersMiddleware>();
+
+    if (!app.Environment.IsDevelopment())
+    {
+        app.UseHsts();
+    }
+
+    // Solo si el proxy envía X-Forwarded-Proto: si no, redirigir causaría un bucle.
+    if (enforceHttps)
+    {
+        app.UseHttpsRedirection();
+    }
+
+    app.UseSerilogRequestLogging(options =>
+        options.EnrichDiagnosticContext = (diagnostics, httpContext) =>
+            diagnostics.Set("ClientIp", httpContext.Connection.RemoteIpAddress?.ToString()));
 
     app.UseExceptionHandler();
 
