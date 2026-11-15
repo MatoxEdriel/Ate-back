@@ -71,12 +71,14 @@ public class CreateRestaurantRequestValidator : AbstractValidator<CreateRestaura
         RuleFor(x => x.MerchantFirstName)
             .NotEmpty().WithMessage("Ingresa los nombres del responsable del restaurante.")
             .MinimumLength(2).WithMessage("Los nombres deben tener al menos 2 caracteres.")
-            .MaximumLength(100).WithMessage("Los nombres no pueden superar 100 caracteres.");
+            .MaximumLength(100).WithMessage("Los nombres no pueden superar 100 caracteres.")
+            .Must(PersonNameRules.IsValid).WithMessage(PersonNameRules.Message);
 
         RuleFor(x => x.MerchantLastName)
             .NotEmpty().WithMessage("Ingresa los apellidos del responsable del restaurante.")
             .MinimumLength(2).WithMessage("Los apellidos deben tener al menos 2 caracteres.")
-            .MaximumLength(100).WithMessage("Los apellidos no pueden superar 100 caracteres.");
+            .MaximumLength(100).WithMessage("Los apellidos no pueden superar 100 caracteres.")
+            .Must(PersonNameRules.IsValid).WithMessage(PersonNameRules.Message);
 
         RuleFor(x => x.MerchantEmail)
             .NotEmpty().WithMessage("Ingresa el correo del responsable del restaurante.")

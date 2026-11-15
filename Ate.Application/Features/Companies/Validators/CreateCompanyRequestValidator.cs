@@ -66,12 +66,14 @@ public class CreateCompanyRequestValidator : AbstractValidator<CreateCompanyRequ
         RuleFor(x => x.AdminFirstName)
             .NotEmpty().WithMessage("Ingresa los nombres del administrador de RRHH.")
             .MinimumLength(2).WithMessage("Los nombres deben tener al menos 2 caracteres.")
-            .MaximumLength(100).WithMessage("Los nombres no pueden superar 100 caracteres.");
+            .MaximumLength(100).WithMessage("Los nombres no pueden superar 100 caracteres.")
+            .Must(PersonNameRules.IsValid).WithMessage(PersonNameRules.Message);
 
         RuleFor(x => x.AdminLastName)
             .NotEmpty().WithMessage("Ingresa los apellidos del administrador de RRHH.")
             .MinimumLength(2).WithMessage("Los apellidos deben tener al menos 2 caracteres.")
-            .MaximumLength(100).WithMessage("Los apellidos no pueden superar 100 caracteres.");
+            .MaximumLength(100).WithMessage("Los apellidos no pueden superar 100 caracteres.")
+            .Must(PersonNameRules.IsValid).WithMessage(PersonNameRules.Message);
 
         RuleFor(x => x.AdminEmail)
             .NotEmpty().WithMessage("Ingresa el correo del administrador de RRHH.")

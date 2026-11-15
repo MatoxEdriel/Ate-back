@@ -23,7 +23,8 @@ public class CreateEmployeeRequestValidator : AbstractValidator<CreateEmployeeRe
             .MinimumLength(2)
             .WithMessage("Los nombres deben tener al menos 2 caracteres.")
             .MaximumLength(100)
-            .WithMessage("Los nombres no pueden superar 100 caracteres.");
+            .WithMessage("Los nombres no pueden superar 100 caracteres.")
+            .Must(PersonNameRules.IsValid).WithMessage(PersonNameRules.Message);
 
         RuleFor(x => x.LastName)
             .NotEmpty()
@@ -31,7 +32,8 @@ public class CreateEmployeeRequestValidator : AbstractValidator<CreateEmployeeRe
             .MinimumLength(2)
             .WithMessage("Los apellidos deben tener al menos 2 caracteres.")
             .MaximumLength(100)
-            .WithMessage("Los apellidos no pueden superar 100 caracteres.");
+            .WithMessage("Los apellidos no pueden superar 100 caracteres.")
+            .Must(PersonNameRules.IsValid).WithMessage(PersonNameRules.Message);
 
         RuleFor(x => x.Email)
             .NotEmpty()
