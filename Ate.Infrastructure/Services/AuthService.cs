@@ -1,3 +1,4 @@
+using Ate.Application.Common.Security;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Features.Auth.DTOs;
 using Ate.Domain.Common;
@@ -47,19 +48,19 @@ public class AuthService : IAuthService, IScopedDependency
     private string GetDummyPasswordHash() =>
         _dummyPasswordHash ??= _passwordHasher.HashPassword(Guid.NewGuid().ToString("N"));
 
-    public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request, string? clientIp = null, CancellationToken cancellationToken = default)
+    public async Task<Result<AuthSession>> LoginAsync(LoginRequest request, string? clientIp = null, CancellationToken cancellationToken = default)
     {
         var validationResult = await _loginValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
-            return Result.Failure<LoginResponse>(AuthErrors.InvalidCredentials);
+            return Result.Failure<AuthSession>(AuthErrors.InvalidCredentials);
         }
 
         var normalizedDocumentNumber = request.DocumentNumber.Trim();
 
         if (_loginAttemptLimiter.GetRetryAfter(normalizedDocumentNumber, clientIp) is { } retryAfter)
         {
-            return Result.Failure<LoginResponse>(AuthErrors.TooManyLoginAttempts(retryAfter));
+            return Result.Failure<AuthSession>(AuthErrors.TooManyLoginAttempts(retryAfter));
         }
 
         var user = await _context.Users
@@ -83,31 +84,31 @@ public class AuthService : IAuthService, IScopedDependency
         if (user == null || !hasUsableHash || !isValidPassword)
         {
             _loginAttemptLimiter.RegisterFailure(normalizedDocumentNumber, clientIp);
-            return Result.Failure<LoginResponse>(AuthErrors.InvalidCredentials);
+            return Result.Failure<AuthSession>(AuthErrors.InvalidCredentials);
         }
 
         _loginAttemptLimiter.Reset(normalizedDocumentNumber, clientIp);
 
         if (!user.IsActive)
         {
-            return Result.Failure<LoginResponse>(AuthErrors.UserInactive);
+            return Result.Failure<AuthSession>(AuthErrors.UserInactive);
         }
 
         if (user.Company is { IsActive: false })
         {
-            return Result.Failure<LoginResponse>(AuthErrors.CompanyInactive);
+            return Result.Failure<AuthSession>(AuthErrors.CompanyInactive);
         }
 
         if (user.MustChangePassword && user.TemporaryPasswordExpiresAt < _dateTimeProvider.UtcNow)
         {
-            return Result.Failure<LoginResponse>(AuthErrors.TemporaryPasswordExpired);
+            return Result.Failure<AuthSession>(AuthErrors.TemporaryPasswordExpired);
         }
 
         // Also covers employees deactivated by HR and employees of a deactivated company.
         var accessError = await _accessValidator.ValidateAsync(user.Id, cancellationToken: cancellationToken);
         if (accessError is { } blocked)
         {
-            return Result.Failure<LoginResponse>(blocked);
+            return Result.Failure<AuthSession>(blocked);
         }
 
         var roles = user.UserRoles
@@ -117,18 +118,7 @@ public class AuthService : IAuthService, IScopedDependency
             .ToList();
 
         var (accessToken, expiresAt) = _jwtTokenGenerator.GenerateToken(user, roles);
-        var refreshTokenString = _jwtTokenGenerator.GenerateRefreshToken();
-
-        var refreshToken = new RefreshToken
-        {
-            Id = Guid.CreateVersion7(),
-            UserId = user.Id,
-            Token = refreshTokenString,
-            ExpiresAt = _dateTimeProvider.UtcNow.AddDays(7),
-            CreatedAt = _dateTimeProvider.UtcNow,
-            IsRevoked = false
-        };
-
+        var (refreshToken, refreshTokenString) = CreateRefreshToken(user.Id, roles);
         _context.RefreshTokens.Add(refreshToken);
 
         var trackedUser = await _context.Users.FirstOrDefaultAsync(u => u.Id == user.Id, cancellationToken);
@@ -158,16 +148,16 @@ public class AuthService : IAuthService, IScopedDependency
             ToCompanyDto(user.Company),
             user.MustChangePassword);
 
-        return Result.Success(new LoginResponse(accessToken, refreshTokenString, expiresAt, userDto));
+        return Result.Success(new AuthSession(new LoginResponse(accessToken, expiresAt, userDto), refreshTokenString, refreshToken.ExpiresAt));
     }
 
-    public async Task<Result<LoginResponse>> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken = default)
+    public async Task<Result<AuthSession>> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken cancellationToken = default)
     {
         var validationResult = await _changePasswordValidator.ValidateAsync(request, cancellationToken);
         if (!validationResult.IsValid)
         {
             var errors = validationResult.Errors.Select(e => e.ErrorMessage).Distinct().ToList();
-            return Result.Failure<LoginResponse>(Error.Validation("Auth.ChangePassword", errors.FirstOrDefault() ?? "Revisa los datos ingresados.", errors));
+            return Result.Failure<AuthSession>(Error.Validation("Auth.ChangePassword", errors.FirstOrDefault() ?? "Revisa los datos ingresados.", errors));
         }
 
         var user = await _context.Users
@@ -179,38 +169,38 @@ public class AuthService : IAuthService, IScopedDependency
 
         if (user == null)
         {
-            return Result.Failure<LoginResponse>(AuthErrors.InvalidToken);
+            return Result.Failure<AuthSession>(AuthErrors.InvalidToken);
         }
 
         if (!user.IsActive)
         {
-            return Result.Failure<LoginResponse>(AuthErrors.UserInactive);
+            return Result.Failure<AuthSession>(AuthErrors.UserInactive);
         }
 
         if (user.Company is { IsActive: false })
         {
-            return Result.Failure<LoginResponse>(AuthErrors.CompanyInactive);
+            return Result.Failure<AuthSession>(AuthErrors.CompanyInactive);
         }
 
         // Also covers employees deactivated by HR and employees of a deactivated company.
         var accessError = await _accessValidator.ValidateAsync(user.Id, cancellationToken: cancellationToken);
         if (accessError is { } blocked)
         {
-            return Result.Failure<LoginResponse>(blocked);
+            return Result.Failure<AuthSession>(blocked);
         }
 
         if (user.MustChangePassword)
         {
             if (!string.IsNullOrEmpty(user.PasswordHash) && _passwordHasher.VerifyPassword(request.NewPassword, user.PasswordHash))
             {
-                return Result.Failure<LoginResponse>(AuthErrors.PasswordReused);
+                return Result.Failure<AuthSession>(AuthErrors.PasswordReused);
             }
         }
         else if (string.IsNullOrEmpty(request.CurrentPassword) ||
                  string.IsNullOrEmpty(user.PasswordHash) ||
                  !_passwordHasher.VerifyPassword(request.CurrentPassword, user.PasswordHash))
         {
-            return Result.Failure<LoginResponse>(AuthErrors.InvalidCurrentPassword);
+            return Result.Failure<AuthSession>(AuthErrors.InvalidCurrentPassword);
         }
 
         var now = _dateTimeProvider.UtcNow;
@@ -224,7 +214,7 @@ public class AuthService : IAuthService, IScopedDependency
             .ToListAsync(cancellationToken);
         foreach (var token in activeTokens)
         {
-            token.IsRevoked = true;
+            Revoke(token, RevocationReasons.Password);
         }
 
         var roles = user.UserRoles
@@ -234,16 +224,8 @@ public class AuthService : IAuthService, IScopedDependency
             .ToList();
 
         var (accessToken, expiresAt) = _jwtTokenGenerator.GenerateToken(user, roles);
-        var refreshTokenString = _jwtTokenGenerator.GenerateRefreshToken();
-        _context.RefreshTokens.Add(new RefreshToken
-        {
-            Id = Guid.CreateVersion7(),
-            UserId = user.Id,
-            Token = refreshTokenString,
-            ExpiresAt = now.AddDays(7),
-            CreatedAt = now,
-            IsRevoked = false
-        });
+        var (refreshToken, refreshTokenString) = CreateRefreshToken(user.Id, roles);
+        _context.RefreshTokens.Add(refreshToken);
 
         await _context.SaveChangesAsync(cancellationToken);
 
@@ -260,7 +242,7 @@ public class AuthService : IAuthService, IScopedDependency
             ToCompanyDto(user.Company),
             user.MustChangePassword);
 
-        return Result.Success(new LoginResponse(accessToken, refreshTokenString, expiresAt, userDto));
+        return Result.Success(new AuthSession(new LoginResponse(accessToken, expiresAt, userDto), refreshTokenString, refreshToken.ExpiresAt));
     }
 
     public async Task<Result<CurrentUserDto>> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -292,7 +274,7 @@ public class AuthService : IAuthService, IScopedDependency
             user.Roles));
     }
 
-    public async Task<Result<LoginResponse>> GenerateDevTokenAsync(DevTokenRequest? request = null, CancellationToken cancellationToken = default)
+    public async Task<Result<AuthSession>> GenerateDevTokenAsync(DevTokenRequest? request = null, CancellationToken cancellationToken = default)
     {
         var targetRole = string.IsNullOrWhiteSpace(request?.Role) ? RoleConstants.SuperAdmin : request.Role.Trim();
         var roles = targetRole.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
@@ -344,20 +326,10 @@ public class AuthService : IAuthService, IScopedDependency
         }
 
         var (accessToken, expiresAt) = _jwtTokenGenerator.GenerateToken(user, roles);
-        var refreshTokenString = _jwtTokenGenerator.GenerateRefreshToken();
+        var (refreshToken, refreshTokenString) = CreateRefreshToken(user.Id, roles);
 
         try
         {
-            var refreshToken = new RefreshToken
-            {
-                Id = Guid.CreateVersion7(),
-                UserId = user.Id,
-                Token = refreshTokenString,
-                ExpiresAt = _dateTimeProvider.UtcNow.AddDays(7),
-                CreatedAt = _dateTimeProvider.UtcNow,
-                IsRevoked = false
-            };
-
             _context.RefreshTokens.Add(refreshToken);
             await _context.SaveChangesAsync(cancellationToken);
         }
@@ -378,7 +350,133 @@ public class AuthService : IAuthService, IScopedDependency
             ToCompanyDto(user.Company),
             user.MustChangePassword);
 
-        return Result.Success(new LoginResponse(accessToken, refreshTokenString, expiresAt, userDto));
+        return Result.Success(new AuthSession(new LoginResponse(accessToken, expiresAt, userDto), refreshTokenString, refreshToken.ExpiresAt));
+    }
+
+    public async Task<Result<AuthSession>> RefreshAsync(string refreshToken, CancellationToken cancellationToken = default)
+    {
+        var now = _dateTimeProvider.UtcNow;
+        var tokenHash = RefreshTokenHasher.Hash(refreshToken);
+
+        var stored = await _context.RefreshTokens
+            .Include(t => t.User).ThenInclude(u => u.Person)
+            .Include(t => t.User).ThenInclude(u => u.Company)
+            .Include(t => t.User).ThenInclude(u => u.UserRoles).ThenInclude(ur => ur.Role)
+            .FirstOrDefaultAsync(t => t.Token == tokenHash, cancellationToken);
+
+        if (stored == null || stored.ExpiresAt <= now)
+        {
+            return Result.Failure<AuthSession>(AuthErrors.InvalidToken);
+        }
+
+        if (stored.IsRevoked)
+        {
+            // Recién rotado (otra pestaña refrescó al mismo tiempo): se acepta dentro de la gracia.
+            var withinGrace = stored.RevocationReason == RevocationReasons.Rotated
+                && stored.RevokedAt is { } revokedAt
+                && now - revokedAt <= RefreshLifetime.RotationGrace;
+
+            if (!withinGrace)
+            {
+                // Reuso de un token ya usado o revocado: posible robo. Se cierran todas las sesiones.
+                await RevokeAllAsync(stored.UserId, RevocationReasons.Reuse, cancellationToken);
+                await _context.SaveChangesAsync(cancellationToken);
+                return Result.Failure<AuthSession>(AuthErrors.InvalidToken);
+            }
+        }
+
+        var user = stored.User;
+        if (user.IsDeleted)
+        {
+            return Result.Failure<AuthSession>(AuthErrors.InvalidToken);
+        }
+
+        if (await _accessValidator.ValidateAsync(user.Id, cancellationToken: cancellationToken) is { } blocked)
+        {
+            return Result.Failure<AuthSession>(blocked);
+        }
+
+        if (!stored.IsRevoked)
+        {
+            Revoke(stored, RevocationReasons.Rotated);
+        }
+
+        var roles = user.UserRoles
+            .Where(ur => ur.Role != null && !string.IsNullOrWhiteSpace(ur.Role.Name))
+            .Select(ur => ur.Role.Name)
+            .Distinct()
+            .ToList();
+
+        var (accessToken, expiresAt) = _jwtTokenGenerator.GenerateToken(user, roles);
+        var (newToken, newTokenString) = CreateRefreshToken(user.Id, roles);
+        _context.RefreshTokens.Add(newToken);
+        await _context.SaveChangesAsync(cancellationToken);
+
+        var fullName = user.Person != null
+            ? $"{user.Person.FirstName} {user.Person.LastName}".Trim()
+            : user.Email ?? string.Empty;
+
+        var userDto = new UserDto(
+            user.Id,
+            user.Email ?? string.Empty,
+            fullName,
+            user.Person?.AvatarUrl,
+            roles,
+            ToCompanyDto(user.Company),
+            user.MustChangePassword);
+
+        return Result.Success(new AuthSession(new LoginResponse(accessToken, expiresAt, userDto), newTokenString, newToken.ExpiresAt));
+    }
+
+    public async Task LogoutAsync(string? refreshToken, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(refreshToken))
+        {
+            return;
+        }
+
+        var tokenHash = RefreshTokenHasher.Hash(refreshToken);
+        var stored = await _context.RefreshTokens.FirstOrDefaultAsync(t => t.Token == tokenHash, cancellationToken);
+        if (stored is { IsRevoked: false })
+        {
+            Revoke(stored, RevocationReasons.Logout);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>Nuevo refresh token: el valor en claro va a la cookie; en la base solo su SHA-256.</summary>
+    private (RefreshToken Entity, string Raw) CreateRefreshToken(Guid userId, IReadOnlyCollection<string> roles)
+    {
+        var raw = _jwtTokenGenerator.GenerateRefreshToken();
+        var now = _dateTimeProvider.UtcNow;
+        var entity = new RefreshToken
+        {
+            Id = Guid.CreateVersion7(),
+            UserId = userId,
+            Token = RefreshTokenHasher.Hash(raw),
+            ExpiresAt = now + RefreshLifetime.For(roles),
+            CreatedAt = now,
+            IsRevoked = false
+        };
+        return (entity, raw);
+    }
+
+    private void Revoke(RefreshToken token, string reason)
+    {
+        token.IsRevoked = true;
+        token.RevokedAt = _dateTimeProvider.UtcNow;
+        token.RevocationReason = reason;
+    }
+
+    private async Task RevokeAllAsync(Guid userId, string reason, CancellationToken cancellationToken)
+    {
+        var active = await _context.RefreshTokens
+            .Where(t => t.UserId == userId && !t.IsRevoked)
+            .ToListAsync(cancellationToken);
+        foreach (var token in active)
+        {
+            Revoke(token, reason);
+        }
     }
 
     private static CompanyDto? ToCompanyDto(Company? company)

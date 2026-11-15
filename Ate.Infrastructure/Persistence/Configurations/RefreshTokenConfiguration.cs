@@ -23,6 +23,9 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
             .IsRequired()
             .HasDefaultValue(false);
 
+        builder.Property(rt => rt.RevocationReason)
+            .HasMaxLength(20);
+
         builder.HasOne(rt => rt.User)
             .WithMany(u => u.RefreshTokens)
             .HasForeignKey(rt => rt.UserId)

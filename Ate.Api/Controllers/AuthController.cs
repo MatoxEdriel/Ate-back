@@ -38,7 +38,46 @@ public class AuthController : ControllerBase
     {
         var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
         var result = await _authService.LoginAsync(request, clientIp, cancellationToken);
-        return result.ToActionResult(this, "User authenticated successfully.");
+        return SessionResult(result, "User authenticated successfully.");
+    }
+
+    [HttpPost("refresh")]
+    [AllowAnonymous]
+    [AllowWhilePasswordChangeRequired]
+    [EnableRateLimiting(RateLimitPolicies.Login)]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
+    [EndpointSummary("Renew the session with the refresh cookie")]
+    [EndpointDescription("Reads the HttpOnly refresh cookie, rotates it and returns a new short-lived access token. A reused token outside the 30 s grace window revokes every session of the user.")]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<LoginResponse>), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Refresh(CancellationToken cancellationToken)
+    {
+        var refreshToken = RefreshCookie.Read(Request);
+        if (refreshToken == null)
+        {
+            return ResultExtensions.ToErrorActionResult<LoginResponse>(AuthErrors.InvalidToken, this);
+        }
+
+        var result = await _authService.RefreshAsync(refreshToken, cancellationToken);
+        if (result.IsFailure)
+        {
+            RefreshCookie.Clear(Response);
+        }
+
+        return SessionResult(result, "Session renewed.");
+    }
+
+    [HttpPost("logout")]
+    [AllowAnonymous]
+    [AllowWhilePasswordChangeRequired]
+    [EndpointSummary("Close the session")]
+    [EndpointDescription("Revokes the refresh cookie and deletes it. The short-lived access token expires on its own.")]
+    [ProducesResponseType(StatusCodes.Status204NoContent)]
+    public async Task<IActionResult> Logout(CancellationToken cancellationToken)
+    {
+        await _authService.LogoutAsync(RefreshCookie.Read(Request), cancellationToken);
+        RefreshCookie.Clear(Response);
+        return NoContent();
     }
 
     [HttpGet("me")]
@@ -80,7 +119,7 @@ public class AuthController : ControllerBase
         }
 
         var result = await _authService.ChangePasswordAsync(userId.Value, request, cancellationToken);
-        return result.ToActionResult(this, "Contraseña actualizada.");
+        return SessionResult(result, "Contraseña actualizada.");
     }
 
     [HttpPost("dev-token")]
@@ -93,7 +132,7 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> GenerateDevToken([FromBody] DevTokenRequest? request, CancellationToken cancellationToken)
     {
         var result = await _authService.GenerateDevTokenAsync(request, cancellationToken);
-        return result.ToActionResult(this, "Development token generated successfully.");
+        return SessionResult(result, "Development token generated successfully.");
     }
 
     [HttpGet("dev-token")]
@@ -107,6 +146,18 @@ public class AuthController : ControllerBase
     {
         var request = new DevTokenRequest(role, email);
         var result = await _authService.GenerateDevTokenAsync(request, cancellationToken);
-        return result.ToActionResult(this, "Development token generated successfully.");
+        return SessionResult(result, "Development token generated successfully.");
+    }
+
+    /// <summary>Pone el refresh token en la cookie HttpOnly y devuelve solo el access token en el cuerpo.</summary>
+    private IActionResult SessionResult(Ate.Domain.Common.Result<AuthSession> result, string message)
+    {
+        if (result.IsFailure)
+        {
+            return ResultExtensions.ToErrorActionResult<LoginResponse>(result.Error, this);
+        }
+
+        RefreshCookie.Set(Response, result.Value);
+        return Ok(ApiResponse<LoginResponse>.SuccessResponse(result.Value.Response, message));
     }
 }

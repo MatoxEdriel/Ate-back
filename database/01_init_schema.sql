@@ -286,6 +286,13 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     CONSTRAINT uq_refresh_tokens_token UNIQUE (token)
 );
 
+-- Refresh tokens: se guarda el SHA-256 (64 hex), se rotan en cada uso y se registra por qué se revocaron.
+ALTER TABLE refresh_tokens ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ NULL;
+ALTER TABLE refresh_tokens ADD COLUMN IF NOT EXISTS revocation_reason VARCHAR(20) NULL;
+-- Los tokens antiguos se guardaban en claro: se revocan (una sola vez; los nuevos miden 64).
+UPDATE refresh_tokens SET is_revoked = TRUE, revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP), revocation_reason = COALESCE(revocation_reason, 'legacy')
+WHERE length(token) <> 64 AND is_revoked = FALSE;
+
 -- 7b. PASSWORD_RECOVERIES (código OTP para restablecer la contraseña)
 -- Solo se guardan hashes. El código vence en code_expires_at; al verificarlo se emite un
 -- token de un solo uso que vence en reset_token_expires_at.

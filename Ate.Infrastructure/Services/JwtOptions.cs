@@ -17,5 +17,5 @@ public class JwtOptions
     public string Audience { get; set; } = "Ate.Client";
 
     [Range(1, 43200, ErrorMessage = "JWT ExpirationInMinutes must be between 1 and 43200.")]
-    public int ExpirationInMinutes { get; set; } = 480;
+    public int ExpirationInMinutes { get; set; } = 15;
 }

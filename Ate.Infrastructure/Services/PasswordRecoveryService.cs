@@ -1,3 +1,4 @@
+using Ate.Domain.Constants;
 using System.Security.Cryptography;
 using System.Text;
 using Ate.Application.Common.Interfaces;
@@ -227,6 +228,8 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
         foreach (var token in activeTokens)
         {
             token.IsRevoked = true;
+            token.RevokedAt = now;
+            token.RevocationReason = RevocationReasons.Password;
         }
 
         if (!await TrySaveAsync(cancellationToken))
