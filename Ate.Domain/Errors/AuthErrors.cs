@@ -10,6 +10,9 @@ public static class AuthErrors
     public static readonly Error InvalidCredentials =
         Error.Unauthorized("Auth.InvalidCredentials", "Cédula o contraseña incorrecta.");
 
+    public static readonly Error TemporaryPasswordExpired =
+        Error.Unauthorized("Auth.TemporaryPasswordExpired", "Tu contraseña temporal venció. Usa «Olvidé mi contraseña» para crear una nueva.");
+
     public static readonly Error UserInactive =
         Error.Forbidden("Auth.UserInactive", "Tu cuenta está desactivada o bloqueada. Comunícate con un administrador.");
 

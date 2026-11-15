@@ -9,6 +9,8 @@ public class User : BaseAuditableEntity
     public bool IsActive { get; set; } = true;
     public bool EmailConfirmed { get; set; }
     public bool MustChangePassword { get; set; }
+    /// <summary>Vencimiento de la contraseña temporal; null cuando la contraseña la eligió el usuario.</summary>
+    public DateTimeOffset? TemporaryPasswordExpiresAt { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
     public Guid? CompanyId { get; set; }
 

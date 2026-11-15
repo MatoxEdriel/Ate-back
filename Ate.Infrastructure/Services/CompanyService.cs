@@ -1,3 +1,4 @@
+using Ate.Application.Common.Security;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Common.Models.Emails;
 using Ate.Application.Features.Companies.DTOs;
@@ -185,6 +186,7 @@ public class CompanyService : ICompanyService, IScopedDependency
             IsActive = true,
             EmailConfirmed = false,
             MustChangePassword = true,
+            TemporaryPasswordExpiresAt = DateTimeOffset.UtcNow + PasswordPolicy.TemporaryPasswordLifetime,
             CompanyId = company.Id
         };
 

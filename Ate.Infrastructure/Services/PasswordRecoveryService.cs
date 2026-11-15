@@ -215,6 +215,7 @@ public class PasswordRecoveryService : IPasswordRecoveryService, IScopedDependen
         var user = recovery.User;
         user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
         user.MustChangePassword = false;
+        user.TemporaryPasswordExpiresAt = null;
         recovery.UsedAt = now;
 
         await InvalidateOpenRecoveriesAsync(user.Id, now, cancellationToken, exceptId: recovery.Id);

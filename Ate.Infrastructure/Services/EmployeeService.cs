@@ -1,3 +1,4 @@
+using Ate.Application.Common.Security;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Common.Models.Emails;
 using Ate.Application.Features.Employees.DTOs;
@@ -113,7 +114,8 @@ public class EmployeeService : IEmployeeService, IScopedDependency
             PasswordHash = _passwordHasher.HashPassword(temporaryPassword),
             IsActive = true,
             EmailConfirmed = false,
-            MustChangePassword = true
+            MustChangePassword = true,
+            TemporaryPasswordExpiresAt = DateTimeOffset.UtcNow + PasswordPolicy.TemporaryPasswordLifetime
         };
 
         var person = new Person

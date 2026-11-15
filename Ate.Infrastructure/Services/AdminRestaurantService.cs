@@ -1,3 +1,4 @@
+using Ate.Application.Common.Security;
 using System.Globalization;
 using System.Text;
 using Ate.Application.Common.Interfaces;
@@ -109,7 +110,8 @@ public class AdminRestaurantService : IAdminRestaurantService, IScopedDependency
             PasswordHash = _passwordHasher.HashPassword(temporaryPassword),
             IsActive = true,
             EmailConfirmed = false,
-            MustChangePassword = true
+            MustChangePassword = true,
+            TemporaryPasswordExpiresAt = DateTimeOffset.UtcNow + PasswordPolicy.TemporaryPasswordLifetime
         };
 
         var person = new Person

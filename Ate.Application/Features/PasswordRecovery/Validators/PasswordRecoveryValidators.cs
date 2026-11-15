@@ -1,3 +1,4 @@
+using Ate.Application.Common.Security;
 using Ate.Application.Features.PasswordRecovery.DTOs;
 using FluentValidation;
 
@@ -74,9 +75,11 @@ public class ResetPasswordRequestValidator : AbstractValidator<ResetPasswordRequ
             .Cascade(CascadeMode.Stop)
             .NotEmpty()
             .WithMessage("Ingresa tu nueva contraseña.")
-            .MinimumLength(PasswordRecoveryConstants.MinPasswordLength)
-            .WithMessage($"La contraseña debe tener al menos {PasswordRecoveryConstants.MinPasswordLength} caracteres.")
-            .MaximumLength(PasswordRecoveryConstants.MaxPasswordLength)
-            .WithMessage($"La contraseña puede tener como máximo {PasswordRecoveryConstants.MaxPasswordLength} caracteres.");
+            .MinimumLength(PasswordPolicy.MinLength)
+            .WithMessage(PasswordPolicy.TooShortMessage)
+            .MaximumLength(PasswordPolicy.MaxLength)
+            .WithMessage(PasswordPolicy.TooLongMessage)
+            .Must(password => !PasswordPolicy.IsCommon(password))
+            .WithMessage(PasswordPolicy.CommonMessage);
     }
 }

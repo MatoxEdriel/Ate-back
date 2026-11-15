@@ -115,6 +115,8 @@ END $$;
 
 -- 5.1 USERS -> COMPANIES (Company administrators belong to one company)
 ALTER TABLE users ADD COLUMN IF NOT EXISTS company_id UUID NULL;
+-- Contraseña temporal: vence a las 72 h (null cuando la eligió el usuario).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS temporary_password_expires_at TIMESTAMPTZ NULL;
 
 DO $$
 BEGIN

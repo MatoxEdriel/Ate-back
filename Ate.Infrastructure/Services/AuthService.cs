@@ -98,6 +98,11 @@ public class AuthService : IAuthService, IScopedDependency
             return Result.Failure<LoginResponse>(AuthErrors.CompanyInactive);
         }
 
+        if (user.MustChangePassword && user.TemporaryPasswordExpiresAt < _dateTimeProvider.UtcNow)
+        {
+            return Result.Failure<LoginResponse>(AuthErrors.TemporaryPasswordExpired);
+        }
+
         // Also covers employees deactivated by HR and employees of a deactivated company.
         var accessError = await _accessValidator.ValidateAsync(user.Id, cancellationToken);
         if (accessError is { } blocked)
@@ -130,6 +135,12 @@ public class AuthService : IAuthService, IScopedDependency
         if (trackedUser != null)
         {
             trackedUser.LastLoginAt = _dateTimeProvider.UtcNow;
+
+            // Hash con un costo anterior: se recalcula ahora que tenemos la contraseña en claro.
+            if (!string.IsNullOrEmpty(trackedUser.PasswordHash) && _passwordHasher.NeedsRehash(trackedUser.PasswordHash))
+            {
+                trackedUser.PasswordHash = _passwordHasher.HashPassword(request.Password);
+            }
         }
 
         await _context.SaveChangesAsync(cancellationToken);
@@ -205,6 +216,7 @@ public class AuthService : IAuthService, IScopedDependency
         var now = _dateTimeProvider.UtcNow;
         user.PasswordHash = _passwordHasher.HashPassword(request.NewPassword);
         user.MustChangePassword = false;
+        user.TemporaryPasswordExpiresAt = null;
 
         var activeTokens = await _context.RefreshTokens
             .Where(t => t.UserId == user.Id && !t.IsRevoked)
