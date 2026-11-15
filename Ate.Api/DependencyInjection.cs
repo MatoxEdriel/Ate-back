@@ -122,6 +122,24 @@ public static class DependencyInjection
                         QueueLimit = 0
                     }));
 
+            options.AddPolicy(RateLimitPolicies.Refresh, httpContext =>
+            {
+                var cookie = httpContext.Request.Cookies[Ate.Api.Extensions.RefreshCookie.Name];
+                var key = string.IsNullOrEmpty(cookie)
+                    ? $"ip:{httpContext.Connection.RemoteIpAddress}"
+                    : $"rt:{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(cookie)))}";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    key,
+                    _ => new FixedWindowRateLimiterOptions
+                    {
+                        // Con cookie: ~una renovación cada 15 min por pestaña; 20/min cubre recargas y reintentos.
+                        // Sin cookie (solo ruido o ataque): más permisivo que un login normal pero acotado.
+                        PermitLimit = string.IsNullOrEmpty(cookie) ? 60 : 20,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0
+                    });
+            });
+
             options.AddPolicy(RateLimitPolicies.Credentials, httpContext =>
                 RateLimitPartition.GetFixedWindowLimiter(
                     httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value

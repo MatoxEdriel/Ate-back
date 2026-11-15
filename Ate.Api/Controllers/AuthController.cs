@@ -44,7 +44,7 @@ public class AuthController : ControllerBase
     [HttpPost("refresh")]
     [AllowAnonymous]
     [AllowWhilePasswordChangeRequired]
-    [EnableRateLimiting(RateLimitPolicies.Login)]
+    [EnableRateLimiting(RateLimitPolicies.Refresh)]
     [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     [EndpointSummary("Renew the session with the refresh cookie")]
     [EndpointDescription("Reads the HttpOnly refresh cookie, rotates it and returns a new short-lived access token. A reused token outside the 30 s grace window revokes every session of the user.")]

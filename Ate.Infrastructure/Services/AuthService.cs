@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using Ate.Application.Common.Security;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Features.Auth.DTOs;
@@ -22,6 +23,7 @@ public class AuthService : IAuthService, IScopedDependency
     private readonly IValidator<ChangePasswordRequest> _changePasswordValidator;
     private readonly ILoginAttemptLimiter _loginAttemptLimiter;
     private readonly IUserAccessValidator _accessValidator;
+    private readonly bool _rehashPasswords;
 
     public AuthService(
         IApplicationDbContext context,
@@ -32,8 +34,10 @@ public class AuthService : IAuthService, IScopedDependency
         IValidator<ChangePasswordRequest> changePasswordValidator,
         ILoginAttemptLimiter loginAttemptLimiter,
         IUserAccessValidator accessValidator,
-        ISecurityEventLog securityEvents)
+        ISecurityEventLog securityEvents,
+        IConfiguration configuration)
     {
+        _rehashPasswords = configuration.GetValue("Security:RehashPasswords", true);
         _securityEvents = securityEvents;
         _context = context;
         _passwordHasher = passwordHasher;
@@ -128,7 +132,9 @@ public class AuthService : IAuthService, IScopedDependency
             trackedUser.LastLoginAt = _dateTimeProvider.UtcNow;
 
             // Hash con un costo anterior: se recalcula ahora que tenemos la contraseña en claro.
-            if (!string.IsNullOrEmpty(trackedUser.PasswordHash) && _passwordHasher.NeedsRehash(trackedUser.PasswordHash))
+            // En Development queda apagado: la base es compartida y las versiones anteriores del código
+            // no entienden el formato nuevo (fallarían con 500 al iniciar sesión).
+            if (_rehashPasswords && !string.IsNullOrEmpty(trackedUser.PasswordHash) && _passwordHasher.NeedsRehash(trackedUser.PasswordHash))
             {
                 trackedUser.PasswordHash = _passwordHasher.HashPassword(request.Password);
             }
@@ -373,21 +379,29 @@ public class AuthService : IAuthService, IScopedDependency
             return Result.Failure<AuthSession>(AuthErrors.InvalidToken);
         }
 
+        var replayWithinGrace = false;
         if (stored.IsRevoked)
         {
-            // Recién rotado (otra pestaña refrescó al mismo tiempo): se acepta dentro de la gracia.
-            var withinGrace = stored.RevocationReason == RevocationReasons.Rotated
-                && stored.RevokedAt is { } revokedAt
-                && now - revokedAt <= RefreshLifetime.RotationGrace;
-
-            if (!withinGrace)
+            var rotated = stored.RevocationReason == RevocationReasons.Rotated && stored.RevokedAt is not null;
+            if (!rotated)
             {
-                // Reuso de un token ya usado o revocado: posible robo. Se cierran todas las sesiones.
+                // Revocado por logout, cambio de contraseña, migración o reuso: simplemente ya no vale.
+                // No es señal de robo, y revocar todo aquí sacaría también las sesiones nuevas del usuario.
+                return Result.Failure<AuthSession>(AuthErrors.InvalidToken);
+            }
+
+            if (now - stored.RevokedAt!.Value > RefreshLifetime.RotationGrace)
+            {
+                // Un token ya rotado que vuelve a aparecer fuera de la gracia: posible robo. Se cierran todas las sesiones.
                 await RevokeAllAsync(stored.UserId, RevocationReasons.Reuse, cancellationToken);
                 await _context.SaveChangesAsync(cancellationToken);
                 await _securityEvents.RecordAsync(SecurityEventTypes.RefreshReuse, stored.UserId, SecurityEventOutcomes.Failure, "all_sessions_revoked", cancellationToken);
                 return Result.Failure<AuthSession>(AuthErrors.InvalidToken);
             }
+
+            // Dentro de la gracia (otra pestaña rotó hace segundos): solo se entrega un access token nuevo.
+            // No se crea otro refresh token, así un token robado no puede generar sesiones ilimitadas.
+            replayWithinGrace = true;
         }
 
         var user = stored.User;
@@ -401,11 +415,6 @@ public class AuthService : IAuthService, IScopedDependency
             return Result.Failure<AuthSession>(blocked);
         }
 
-        if (!stored.IsRevoked)
-        {
-            Revoke(stored, RevocationReasons.Rotated);
-        }
-
         var roles = user.UserRoles
             .Where(ur => ur.Role != null && !string.IsNullOrWhiteSpace(ur.Role.Name))
             .Select(ur => ur.Role.Name)
@@ -413,9 +422,16 @@ public class AuthService : IAuthService, IScopedDependency
             .ToList();
 
         var (accessToken, expiresAt) = _jwtTokenGenerator.GenerateToken(user, roles);
-        var (newToken, newTokenString) = CreateRefreshToken(user.Id, roles);
-        _context.RefreshTokens.Add(newToken);
-        await _context.SaveChangesAsync(cancellationToken);
+
+        RefreshToken? newToken = null;
+        string? newTokenString = null;
+        if (!replayWithinGrace)
+        {
+            Revoke(stored, RevocationReasons.Rotated);
+            (newToken, newTokenString) = CreateRefreshToken(user.Id, roles);
+            _context.RefreshTokens.Add(newToken);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
 
         var fullName = user.Person != null
             ? $"{user.Person.FirstName} {user.Person.LastName}".Trim()
@@ -430,7 +446,7 @@ public class AuthService : IAuthService, IScopedDependency
             ToCompanyDto(user.Company),
             user.MustChangePassword);
 
-        return Result.Success(new AuthSession(new LoginResponse(accessToken, expiresAt, userDto), newTokenString, newToken.ExpiresAt));
+        return Result.Success(new AuthSession(new LoginResponse(accessToken, expiresAt, userDto), newTokenString, newToken?.ExpiresAt));
     }
 
     public async Task LogoutAsync(string? refreshToken, CancellationToken cancellationToken = default)
