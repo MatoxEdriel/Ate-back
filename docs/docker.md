@@ -105,7 +105,7 @@ services:
     environment:
       POSTGRES_DB: ate_db
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -123,7 +123,7 @@ services:
       - "5252:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=ate_db;Username=postgres;Password=postgres
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=ate_db;Username=postgres;Password=${POSTGRES_PASSWORD}
     depends_on:
       - postgres
 
@@ -160,7 +160,7 @@ docker run -d \
   --name ate-api \
   -p 5252:8080 \
   -e ASPNETCORE_ENVIRONMENT=Development \
-  -e ConnectionStrings__DefaultConnection="Host=tu-host;Port=5432;Database=ate_db;Username=postgres;Password=postgres" \
+  -e ConnectionStrings__DefaultConnection="Host=tu-host;Port=5432;Database=ate_db;Username=postgres;Password=${POSTGRES_PASSWORD}" \
   ate-api:1.0
 ```
 
@@ -171,4 +171,4 @@ docker run -d \
 * **Scalar API Reference (Documentación interactiva):** `http://localhost:5252/scalar/v1`
 * **OpenAPI JSON Spec:** `http://localhost:5252/openapi/v1.json`
 * **Health Check:** `http://localhost:5252/api/health`
-* **Conexión a PostgreSQL (DBeaver / psql):** `localhost:5432` (Base de datos: `ate_db`, Usuario: `postgres`, Password: `postgres`)
+* **Conexión a PostgreSQL (DBeaver / psql):** `localhost:5432` (Base de datos: `ate_db`, Usuario: `postgres`, contraseña: la de `POSTGRES_PASSWORD` en tu `.env`)
