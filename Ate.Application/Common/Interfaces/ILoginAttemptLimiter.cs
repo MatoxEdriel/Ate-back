@@ -1,15 +1,15 @@
 namespace Ate.Application.Common.Interfaces;
 
 /// <summary>
-/// Counts failed sign-ins per document number and client IP inside a temporary window.
-/// Blocks are never permanent: they end when the window expires.
+/// Límite de intentos de login, persistente. Por cédula + IP: ventana fija. Por cédula sola: bloqueo
+/// progresivo (30 s, 1 min, 2 min… hasta 15 min) para frenar ataques sin dejar a alguien fuera mucho rato.
 /// </summary>
 public interface ILoginAttemptLimiter
 {
-    /// <summary>Time left before the document can be tried again from this IP, or null when allowed.</summary>
-    TimeSpan? GetRetryAfter(string documentNumber, string? clientIp);
+    /// <summary>Tiempo que falta para poder volver a intentar, o null si se permite.</summary>
+    Task<TimeSpan?> GetRetryAfterAsync(string documentNumber, string? clientIp, CancellationToken cancellationToken = default);
 
-    void RegisterFailure(string documentNumber, string? clientIp);
+    Task RegisterFailureAsync(string documentNumber, string? clientIp, CancellationToken cancellationToken = default);
 
-    void Reset(string documentNumber, string? clientIp);
+    Task ResetAsync(string documentNumber, string? clientIp, CancellationToken cancellationToken = default);
 }

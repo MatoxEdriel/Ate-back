@@ -58,7 +58,7 @@ public class AuthService : IAuthService, IScopedDependency
 
         var normalizedDocumentNumber = request.DocumentNumber.Trim();
 
-        if (_loginAttemptLimiter.GetRetryAfter(normalizedDocumentNumber, clientIp) is { } retryAfter)
+        if (await _loginAttemptLimiter.GetRetryAfterAsync(normalizedDocumentNumber, clientIp, cancellationToken) is { } retryAfter)
         {
             return Result.Failure<AuthSession>(AuthErrors.TooManyLoginAttempts(retryAfter));
         }
@@ -83,11 +83,11 @@ public class AuthService : IAuthService, IScopedDependency
 
         if (user == null || !hasUsableHash || !isValidPassword)
         {
-            _loginAttemptLimiter.RegisterFailure(normalizedDocumentNumber, clientIp);
+            await _loginAttemptLimiter.RegisterFailureAsync(normalizedDocumentNumber, clientIp, cancellationToken);
             return Result.Failure<AuthSession>(AuthErrors.InvalidCredentials);
         }
 
-        _loginAttemptLimiter.Reset(normalizedDocumentNumber, clientIp);
+        await _loginAttemptLimiter.ResetAsync(normalizedDocumentNumber, clientIp, cancellationToken);
 
         if (!user.IsActive)
         {

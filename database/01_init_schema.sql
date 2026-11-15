@@ -293,6 +293,14 @@ ALTER TABLE refresh_tokens ADD COLUMN IF NOT EXISTS revocation_reason VARCHAR(20
 UPDATE refresh_tokens SET is_revoked = TRUE, revoked_at = COALESCE(revoked_at, CURRENT_TIMESTAMP), revocation_reason = COALESCE(revocation_reason, 'legacy')
 WHERE length(token) <> 64 AND is_revoked = FALSE;
 
+-- Intentos de login fallidos (claves SHA-256, nunca la cédula). Persisten entre reinicios e instancias.
+CREATE TABLE IF NOT EXISTS login_attempt_windows (
+    key CHAR(64) PRIMARY KEY,
+    failures INT NOT NULL DEFAULT 0,
+    window_start TIMESTAMPTZ NOT NULL,
+    blocked_until TIMESTAMPTZ NULL
+);
+
 -- 7b. PASSWORD_RECOVERIES (código OTP para restablecer la contraseña)
 -- Solo se guardan hashes. El código vence en code_expires_at; al verificarlo se emite un
 -- token de un solo uso que vence en reset_token_expires_at.

@@ -1,116 +1,133 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using Ate.Application.Common.Interfaces;
+using Ate.Domain.Entities;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
 namespace Ate.Infrastructure.Services;
 
 /// <summary>
-/// In-memory fixed windows that start at the first failure. Keys hold a SHA-256 of the document,
-/// never the document itself.
+/// Intentos de login guardados en la base (tabla login_attempt_windows). Las claves son SHA-256: nunca
+/// se guarda la cédula.
 /// </summary>
-public sealed class LoginAttemptLimiter : ILoginAttemptLimiter, ISingletonDependency
+public sealed class LoginAttemptLimiter : ILoginAttemptLimiter, IScopedDependency
 {
-    private const int CleanupThreshold = 10_000;
     private const string UnknownIp = "unknown";
+    private static readonly TimeSpan FirstDocumentBlock = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan MaxDocumentBlock = TimeSpan.FromMinutes(15);
+    private static readonly TimeSpan StaleAfter = TimeSpan.FromDays(1);
 
-    private readonly ConcurrentDictionary<string, AttemptWindow> _windows = new();
+    private readonly IApplicationDbContext _context;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly LoginThrottlingOptions _options;
 
-    public LoginAttemptLimiter(IDateTimeProvider dateTimeProvider, IOptions<LoginThrottlingOptions> options)
+    public LoginAttemptLimiter(IApplicationDbContext context, IDateTimeProvider dateTimeProvider, IOptions<LoginThrottlingOptions> options)
     {
+        _context = context;
         _dateTimeProvider = dateTimeProvider;
         _options = options.Value;
     }
 
     private TimeSpan Window => TimeSpan.FromMinutes(_options.WindowMinutes);
 
-    public TimeSpan? GetRetryAfter(string documentNumber, string? clientIp)
+    public async Task<TimeSpan?> GetRetryAfterAsync(string documentNumber, string? clientIp, CancellationToken cancellationToken = default)
+    {
+        var now = _dateTimeProvider.UtcNow;
+        var (pairKey, documentKey) = Keys(documentNumber, clientIp);
+        var windows = await _context.LoginAttemptWindows
+            .AsNoTracking()
+            .Where(w => w.Key == pairKey || w.Key == documentKey)
+            .ToListAsync(cancellationToken);
+
+        TimeSpan? wait = null;
+
+        var pair = windows.FirstOrDefault(w => w.Key == pairKey);
+        if (pair != null && pair.Failures >= _options.MaxFailuresPerDocumentAndIp && now < pair.WindowStart + Window)
+        {
+            wait = pair.WindowStart + Window - now;
+        }
+
+        var document = windows.FirstOrDefault(w => w.Key == documentKey);
+        if (document?.BlockedUntil is { } blockedUntil && blockedUntil > now)
+        {
+            var documentWait = blockedUntil - now;
+            wait = wait is null || documentWait > wait ? documentWait : wait;
+        }
+
+        return wait;
+    }
+
+    public async Task RegisterFailureAsync(string documentNumber, string? clientIp, CancellationToken cancellationToken = default)
     {
         var now = _dateTimeProvider.UtcNow;
         var (pairKey, documentKey) = Keys(documentNumber, clientIp);
 
-        var pairWait = RemainingBlock(pairKey, _options.MaxFailuresPerDocumentAndIp, now);
-        var documentWait = RemainingBlock(documentKey, _options.MaxFailuresPerDocument, now);
+        var pair = await GetOrCreateAsync(pairKey, now, cancellationToken);
+        Increment(pair, now);
 
-        if (pairWait is null) return documentWait;
-        if (documentWait is null) return pairWait;
-        return pairWait > documentWait ? pairWait : documentWait;
+        var document = await GetOrCreateAsync(documentKey, now, cancellationToken);
+        Increment(document, now);
+        var extra = document.Failures - _options.MaxFailuresPerDocument;
+        if (extra >= 0)
+        {
+            // 30 s, 1 min, 2 min, 4 min… con tope de 15 min.
+            var seconds = Math.Min(FirstDocumentBlock.TotalSeconds * Math.Pow(2, Math.Min(extra, 10)), MaxDocumentBlock.TotalSeconds);
+            document.BlockedUntil = now.AddSeconds(seconds);
+        }
+
+        await _context.SaveChangesAsync(cancellationToken);
+
+        // Limpieza ocasional de contadores viejos.
+        if (Random.Shared.Next(100) == 0)
+        {
+            var cutoff = now - StaleAfter;
+            await _context.LoginAttemptWindows
+                .Where(w => w.WindowStart < cutoff && (w.BlockedUntil == null || w.BlockedUntil < now))
+                .ExecuteDeleteAsync(cancellationToken);
+        }
     }
 
-    public void RegisterFailure(string documentNumber, string? clientIp)
+    public async Task ResetAsync(string documentNumber, string? clientIp, CancellationToken cancellationToken = default)
     {
-        var now = _dateTimeProvider.UtcNow;
         var (pairKey, documentKey) = Keys(documentNumber, clientIp);
-
-        Increment(pairKey, now);
-        Increment(documentKey, now);
-
-        if (_windows.Count > CleanupThreshold)
-            RemoveExpired(now);
+        await _context.LoginAttemptWindows
+            .Where(w => w.Key == pairKey || w.Key == documentKey)
+            .ExecuteDeleteAsync(cancellationToken);
     }
 
-    public void Reset(string documentNumber, string? clientIp)
+    private async Task<LoginAttemptWindow> GetOrCreateAsync(string key, DateTimeOffset now, CancellationToken cancellationToken)
     {
-        var (pairKey, documentKey) = Keys(documentNumber, clientIp);
-        _windows.TryRemove(pairKey, out _);
-        _windows.TryRemove(documentKey, out _);
-    }
-
-    private TimeSpan? RemainingBlock(string key, int limit, DateTimeOffset now)
-    {
-        if (!_windows.TryGetValue(key, out var window))
-            return null;
-
-        lock (window)
+        var window = await _context.LoginAttemptWindows.FirstOrDefaultAsync(w => w.Key == key, cancellationToken);
+        if (window == null)
         {
-            var endsAt = window.StartedAt + Window;
-            if (now >= endsAt || window.Failures < limit)
-                return null;
-            return endsAt - now;
+            window = new LoginAttemptWindow { Key = key, WindowStart = now };
+            _context.LoginAttemptWindows.Add(window);
         }
+
+        return window;
     }
 
-    private void Increment(string key, DateTimeOffset now)
+    private void Increment(LoginAttemptWindow window, DateTimeOffset now)
     {
-        var window = _windows.GetOrAdd(key, _ => new AttemptWindow(now));
-        lock (window)
+        var blocked = window.BlockedUntil is { } until && until > now;
+        if (now >= window.WindowStart + Window && !blocked)
         {
-            if (now >= window.StartedAt + Window)
-            {
-                window.StartedAt = now;
-                window.Failures = 0;
-            }
-            window.Failures++;
+            window.WindowStart = now;
+            window.Failures = 0;
+            window.BlockedUntil = null;
         }
-    }
 
-    private void RemoveExpired(DateTimeOffset now)
-    {
-        foreach (var (key, window) in _windows)
-        {
-            bool expired;
-            lock (window)
-            {
-                expired = now >= window.StartedAt + Window;
-            }
-            if (expired)
-                _windows.TryRemove(key, out _);
-        }
+        window.Failures++;
     }
 
     private static (string PairKey, string DocumentKey) Keys(string documentNumber, string? clientIp)
     {
-        var documentHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(documentNumber.Trim())));
+        var document = documentNumber.Trim();
         var ip = string.IsNullOrWhiteSpace(clientIp) ? UnknownIp : clientIp;
-        return ($"doc-ip:{documentHash}:{ip}", $"doc:{documentHash}");
+        return (Sha256Hex($"doc-ip:{document}:{ip}"), Sha256Hex($"doc:{document}"));
     }
 
-    private sealed class AttemptWindow(DateTimeOffset startedAt)
-    {
-        public DateTimeOffset StartedAt { get; set; } = startedAt;
-        public int Failures { get; set; }
-    }
+    private static string Sha256Hex(string value) =>
+        Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
 }
