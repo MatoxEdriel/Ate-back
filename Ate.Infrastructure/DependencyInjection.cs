@@ -1,3 +1,4 @@
+using Ate.Infrastructure.Storage;
 using Ate.Application.Common.Constants;
 using Ate.Application.Common.Interfaces;
 using Ate.Infrastructure.Extensions;
@@ -85,6 +86,7 @@ public static class DependencyInjection
                 .WithScopedLifetime());
 
         services.AddMongoDb(configuration);
+        services.AddFileStorage(configuration);
 
         return services;
     }

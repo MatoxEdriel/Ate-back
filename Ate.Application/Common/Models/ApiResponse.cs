@@ -1,3 +1,5 @@
+using Ate.Application.Common.Tracing;
+
 namespace Ate.Application.Common.Models;
 
 public class ApiResponse<T>
@@ -8,6 +10,7 @@ public class ApiResponse<T>
     public IReadOnlyList<string>? Errors { get; init; }
     /// <summary>Stable error code (e.g. "PasswordRecovery.CodeExpired") so clients can react without parsing the message.</summary>
     public string? Code { get; init; }
+    public string? TraceId { get; init; }
     public DateTimeOffset Timestamp { get; init; }
 
     public static ApiResponse<T> SuccessResponse(T data, string message = "Operation completed successfully.")
@@ -31,6 +34,7 @@ public class ApiResponse<T>
             Data = default,
             Errors = errors ?? Array.Empty<string>(),
             Code = string.IsNullOrEmpty(code) ? null : code,
+            TraceId = RequestTrace.CurrentId,
             Timestamp = DateTimeOffset.UtcNow
         };
     }
@@ -43,6 +47,7 @@ public class ApiResponse
     public IReadOnlyList<string>? Errors { get; init; }
     /// <summary>Stable error code (e.g. "PasswordRecovery.CodeExpired") so clients can react without parsing the message.</summary>
     public string? Code { get; init; }
+    public string? TraceId { get; init; }
     public DateTimeOffset Timestamp { get; init; }
 
     public static ApiResponse SuccessResponse(string message = "Operation completed successfully.")
@@ -64,6 +69,7 @@ public class ApiResponse
             Message = message,
             Errors = errors ?? Array.Empty<string>(),
             Code = string.IsNullOrEmpty(code) ? null : code,
+            TraceId = RequestTrace.CurrentId,
             Timestamp = DateTimeOffset.UtcNow
         };
     }

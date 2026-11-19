@@ -33,6 +33,8 @@ public class AteDbContext : DbContext, IApplicationDbContext
     public DbSet<CompanyRestaurantAgreement> CompanyRestaurantAgreements => Set<CompanyRestaurantAgreement>();
     public DbSet<AchievementDefinition> AchievementDefinitions => Set<AchievementDefinition>();
     public DbSet<UserAchievement> UserAchievements => Set<UserAchievement>();
+    public DbSet<RestaurantBadgeDefinition> RestaurantBadgeDefinitions => Set<RestaurantBadgeDefinition>();
+    public DbSet<RestaurantBadge> RestaurantBadges => Set<RestaurantBadge>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

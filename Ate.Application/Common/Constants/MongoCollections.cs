@@ -6,4 +6,5 @@ public static class MongoCollections
     public const string DishCatalog = "dish_catalog";
     public const string PayrollSettlements = "payroll_settlements";
     public const string PayrollCloses = "payroll_closes";
+    public const string IdempotencyKeys = "idempotency_keys";
 }

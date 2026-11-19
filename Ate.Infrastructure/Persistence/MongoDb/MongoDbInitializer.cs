@@ -34,6 +34,13 @@ public static class MongoDbInitializer
                 keys.Ascending(o => o.RestaurantId).Ascending(o => o.ServiceDate).Ascending(o => o.Status),
                 new CreateIndexOptions { Name = "ix_employee_orders_restaurant_service_date" }),
             new CreateIndexModel<EmployeeOrder>(
+                keys.Ascending(o => o.RestaurantId).Ascending("Rating.RatedAt"),
+                new CreateIndexOptions<EmployeeOrder>
+                {
+                    Name = "ix_employee_orders_restaurant_rated_at",
+                    PartialFilterExpression = Builders<EmployeeOrder>.Filter.Exists(o => o.Rating)
+                }),
+            new CreateIndexModel<EmployeeOrder>(
                 keys.Ascending(o => o.TicketNumber),
                 new CreateIndexOptions { Name = "ux_employee_orders_ticket_number", Unique = true }),
             new CreateIndexModel<EmployeeOrder>(
@@ -51,6 +58,17 @@ public static class MongoDbInitializer
                 Builders<EmployeeOrder>.Filter.Exists(o => o.ActiveSlot),
                 Builders<EmployeeOrder>.Filter.In(o => o.Status, [EmployeeOrderStatus.Delivered, EmployeeOrderStatus.Cancelled])),
             Builders<EmployeeOrder>.Update.Unset(o => o.ActiveSlot),
+            cancellationToken: cancellationToken);
+
+        if (!existing.Contains(MongoCollections.IdempotencyKeys))
+        {
+            await database.CreateCollectionAsync(MongoCollections.IdempotencyKeys, cancellationToken: cancellationToken);
+        }
+
+        await database.GetCollection<IdempotencyRecord>(MongoCollections.IdempotencyKeys).Indexes.CreateOneAsync(
+            new CreateIndexModel<IdempotencyRecord>(
+                Builders<IdempotencyRecord>.IndexKeys.Ascending(r => r.ExpiresAt),
+                new CreateIndexOptions { Name = "ttl_idempotency_keys_expires_at", ExpireAfter = TimeSpan.Zero }),
             cancellationToken: cancellationToken);
 
         if (!existing.Contains(MongoCollections.PayrollSettlements))

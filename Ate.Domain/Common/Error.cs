@@ -41,11 +41,11 @@ public readonly record struct Error
     public static Error Validation(string code, string description, IReadOnlyList<string>? details = null) =>
         new(code, description, ErrorType.Validation, details);
 
-    public static Error Validation(string entityName, string description) =>
+    public static Error ValidationFor(string entityName, string description) =>
         new($"{entityName}.Validation", description, ErrorType.Validation);
 
     public static Error Validation<TEntity>(string description) =>
-        Validation(typeof(TEntity).Name, description);
+        ValidationFor(typeof(TEntity).Name, description);
 
     public static Error Conflict(string code, string description) =>
         new(code, description, ErrorType.Conflict);

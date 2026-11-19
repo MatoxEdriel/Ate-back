@@ -14,6 +14,8 @@ public class GlobalExceptionHandler : IExceptionHandler
         _environment = environment;
     }
 
+    public const string UnexpectedErrorCode = "Server.UnexpectedError";
+
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
         Exception exception,
@@ -32,7 +34,7 @@ public class GlobalExceptionHandler : IExceptionHandler
             ? new[] { exception.GetType().Name }
             : null;
 
-        var response = ApiResponse<object>.FailureResponse(errorMessage, errors);
+        var response = ApiResponse<object>.FailureResponse(errorMessage, errors, UnexpectedErrorCode);
 
         await httpContext.Response.WriteAsJsonAsync(response, cancellationToken);
 

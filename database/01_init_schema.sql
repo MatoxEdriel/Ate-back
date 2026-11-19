@@ -527,3 +527,54 @@ ON CONFLICT (code) DO UPDATE SET
     threshold = EXCLUDED.threshold,
     is_hidden = EXCLUDED.is_hidden,
     sort_order = EXCLUDED.sort_order;
+
+CREATE TABLE IF NOT EXISTS restaurant_badge_definitions (
+    code VARCHAR(50) PRIMARY KEY,
+    name VARCHAR(80) NOT NULL,
+    description VARCHAR(200) NOT NULL,
+    icon VARCHAR(30) NOT NULL,
+    category VARCHAR(50) NOT NULL,
+    earn_min_positive INT NOT NULL,
+    earn_min_ratio NUMERIC(3,2) NOT NULL,
+    lose_min_negative INT NOT NULL,
+    lose_min_ratio NUMERIC(3,2) NOT NULL,
+    lose_window_days INT NOT NULL,
+    sort_order INT NOT NULL DEFAULT 0,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    CONSTRAINT ck_restaurant_badge_definitions_earn_min CHECK (earn_min_positive > 0),
+    CONSTRAINT ck_restaurant_badge_definitions_lose_min CHECK (lose_min_negative > 0),
+    CONSTRAINT ck_restaurant_badge_definitions_earn_ratio CHECK (earn_min_ratio BETWEEN 0 AND 1),
+    CONSTRAINT ck_restaurant_badge_definitions_lose_ratio CHECK (lose_min_ratio BETWEEN 0 AND 1),
+    CONSTRAINT ck_restaurant_badge_definitions_window CHECK (lose_window_days > 0)
+);
+
+CREATE TABLE IF NOT EXISTS restaurant_badges (
+    restaurant_id UUID NOT NULL,
+    badge_code VARCHAR(50) NOT NULL,
+    is_held BOOLEAN NOT NULL DEFAULT FALSE,
+    earned_at TIMESTAMPTZ NULL,
+    lost_at TIMESTAMPTZ NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_restaurant_badges PRIMARY KEY (restaurant_id, badge_code),
+    CONSTRAINT fk_restaurant_badges_restaurants FOREIGN KEY (restaurant_id) REFERENCES restaurants(id) ON DELETE CASCADE,
+    CONSTRAINT fk_restaurant_badges_definitions FOREIGN KEY (badge_code) REFERENCES restaurant_badge_definitions(code) ON DELETE CASCADE
+);
+
+INSERT INTO restaurant_badge_definitions
+    (code, name, description, icon, category, earn_min_positive, earn_min_ratio, lose_min_negative, lose_min_ratio, lose_window_days, sort_order)
+VALUES
+    ('punctual',  'Puntual',       'Los colaboradores dicen que sus pedidos llegan a tiempo.', 'clock',   'punctual',  10, 0.80, 10, 0.20, 90, 10),
+    ('accurate',  'Pedido exacto', 'Los colaboradores reciben lo que pidieron.',               'check',   'accurate',  10, 0.80, 10, 0.20, 90, 20),
+    ('tasty',     'Buen sabor',    'A los colaboradores les gusta su comida.',                 'chef',    'tasty',     10, 0.80, 10, 0.20, 90, 30),
+    ('packaging', 'Bien empacado', 'Sus pedidos para llevar llegan bien empacados.',           'package', 'packaging', 10, 0.80, 10, 0.20, 90, 40)
+ON CONFLICT (code) DO UPDATE SET
+    name = EXCLUDED.name,
+    description = EXCLUDED.description,
+    icon = EXCLUDED.icon,
+    category = EXCLUDED.category,
+    earn_min_positive = EXCLUDED.earn_min_positive,
+    earn_min_ratio = EXCLUDED.earn_min_ratio,
+    lose_min_negative = EXCLUDED.lose_min_negative,
+    lose_min_ratio = EXCLUDED.lose_min_ratio,
+    lose_window_days = EXCLUDED.lose_window_days,
+    sort_order = EXCLUDED.sort_order;

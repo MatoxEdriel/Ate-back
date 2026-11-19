@@ -10,4 +10,6 @@ public interface IEmployeeOrderService
     Task<Result<PagedResult<EmployeeOrderDto>>> GetMyOrdersAsync(Guid userId, PaginationParams pagination, CancellationToken cancellationToken = default);
     Task<Result<EmployeeOrderDto>> GetMyOrderAsync(Guid userId, string orderId, CancellationToken cancellationToken = default);
     Task<Result<EmployeeOrderDto>> CancelMyOrderAsync(Guid userId, string orderId, CancellationToken cancellationToken = default);
+    Task<Result> RateAsync(Guid userId, string orderId, RateOrderRequest request, CancellationToken cancellationToken = default);
+    Task<Result<PendingRatingDto?>> GetPendingRatingAsync(Guid userId, CancellationToken cancellationToken = default);
 }

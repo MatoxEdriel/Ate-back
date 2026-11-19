@@ -1,3 +1,4 @@
+using Ate.Application.Common.Storage;
 using Microsoft.Extensions.Configuration;
 using Ate.Application.Common.Security;
 using Ate.Application.Common.Interfaces;
@@ -25,6 +26,8 @@ public class AuthService : IAuthService, IScopedDependency
     private readonly IUserAccessValidator _accessValidator;
     private readonly bool _rehashPasswords;
 
+    private readonly ILogoFiles _logoFiles;
+
     public AuthService(
         IApplicationDbContext context,
         IPasswordHasher passwordHasher,
@@ -35,8 +38,10 @@ public class AuthService : IAuthService, IScopedDependency
         ILoginAttemptLimiter loginAttemptLimiter,
         IUserAccessValidator accessValidator,
         ISecurityEventLog securityEvents,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        ILogoFiles logoFiles)
     {
+        _logoFiles = logoFiles;
         _rehashPasswords = configuration.GetValue("Security:RehashPasswords", true);
         _securityEvents = securityEvents;
         _context = context;
@@ -501,10 +506,10 @@ public class AuthService : IAuthService, IScopedDependency
         }
     }
 
-    private static CompanyDto? ToCompanyDto(Company? company)
+    private CompanyDto? ToCompanyDto(Company? company)
     {
         return company == null
             ? null
-            : new CompanyDto(company.Id, company.BusinessName, company.LogoUrl);
+            : new CompanyDto(company.Id, company.BusinessName, _logoFiles.ToPublicUrl(company.LogoUrl));
     }
 }

@@ -1,3 +1,4 @@
+using Ate.Application.Common.Storage;
 using Ate.Application.Common.Security;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Common.Models.Emails;
@@ -24,6 +25,8 @@ public class CompanyService : ICompanyService, IScopedDependency
     private readonly SmtpOptions _smtpOptions;
     private readonly ILogger<CompanyService> _logger;
 
+    private readonly ILogoFiles _logoFiles;
+
     public CompanyService(
         IApplicationDbContext context,
         IPasswordHasher passwordHasher,
@@ -31,7 +34,8 @@ public class CompanyService : ICompanyService, IScopedDependency
         IEmailService emailService,
         IOptions<SmtpOptions> smtpOptions,
         ILogger<CompanyService> logger,
-        ISecurityEventLog securityEvents)
+        ISecurityEventLog securityEvents,
+        ILogoFiles logoFiles)
     {
         _securityEvents = securityEvents;
         _context = context;
@@ -40,6 +44,7 @@ public class CompanyService : ICompanyService, IScopedDependency
         _emailService = emailService;
         _smtpOptions = smtpOptions.Value;
         _logger = logger;
+        _logoFiles = logoFiles;
     }
 
     public async Task<Result<IReadOnlyList<CompanyDto>>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -177,11 +182,21 @@ public class CompanyService : ICompanyService, IScopedDependency
             Email = NullIfBlank(request.Email)?.ToLowerInvariant(),
             Phone = NullIfBlank(request.Phone),
             Address = NullIfBlank(request.Address),
-            LogoUrl = string.IsNullOrEmpty(request.Logo) ? null : request.Logo,
             Latitude = request.Latitude,
             Longitude = request.Longitude,
             IsActive = true
         };
+
+        if (!string.IsNullOrEmpty(request.Logo))
+        {
+            var logo = await _logoFiles.SaveAsync(request.Logo, LogoFiles.Companies, company.Id, cancellationToken);
+            if (logo.IsFailure)
+            {
+                return Result.Failure<CreateCompanyResponse>(logo.Error);
+            }
+
+            company.LogoUrl = logo.Value;
+        }
 
         var user = new User
         {
@@ -218,7 +233,15 @@ public class CompanyService : ICompanyService, IScopedDependency
             AssignedAt = DateTimeOffset.UtcNow
         });
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            await _logoFiles.DeleteStoredAsync(company.LogoUrl, CancellationToken.None);
+            throw;
+        }
 
         var adminFullName = $"{person.FirstName} {person.LastName}".Trim();
 
@@ -247,7 +270,7 @@ public class CompanyService : ICompanyService, IScopedDependency
     private static string? NullIfBlank(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static CompanyDto ToDto(Company company, int employeeCount, string? adminName, string? adminEmail) =>
+    private CompanyDto ToDto(Company company, int employeeCount, string? adminName, string? adminEmail) =>
         new(
             company.Id,
             company.BusinessName,
@@ -256,7 +279,7 @@ public class CompanyService : ICompanyService, IScopedDependency
             company.Email,
             company.Phone,
             company.Address,
-            company.LogoUrl,
+            _logoFiles.ToPublicUrl(company.LogoUrl),
             company.Latitude,
             company.Longitude,
             company.IsActive,

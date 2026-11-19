@@ -2,6 +2,7 @@ using Ate.Api.Extensions;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Common.Models;
 using Ate.Application.Features.MerchantRestaurant.DTOs;
+using Ate.Application.Features.RestaurantBadges.DTOs;
 using Ate.Domain.Constants;
 using Ate.Domain.Errors;
 using Microsoft.AspNetCore.Authorization;
@@ -17,10 +18,29 @@ namespace Ate.Api.Controllers;
 public class MerchantRestaurantController : ControllerBase
 {
     private readonly IMerchantRestaurantService _merchantRestaurantService;
+    private readonly IRestaurantBadgeService _badgeService;
 
-    public MerchantRestaurantController(IMerchantRestaurantService merchantRestaurantService)
+    public MerchantRestaurantController(IMerchantRestaurantService merchantRestaurantService, IRestaurantBadgeService badgeService)
     {
         _merchantRestaurantService = merchantRestaurantService;
+        _badgeService = badgeService;
+    }
+
+    [HttpGet("badges")]
+    [EndpointSummary("Get the restaurant's badges and its ratings of the last 90 days")]
+    [EndpointDescription("One entry per active badge: whether the restaurant holds it, since when, and the thumbs up/down of its category in the last 90 days. Never says who rated.")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<MerchantBadgeSummaryDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<MerchantBadgeSummaryDto>>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> GetBadges(CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return ResultExtensions.ToErrorActionResult<IReadOnlyList<MerchantBadgeSummaryDto>>(AuthErrors.InvalidToken, this);
+        }
+
+        var result = await _badgeService.GetMerchantSummaryAsync(userId.Value, cancellationToken);
+        return result.ToActionResult(this, "Badges retrieved successfully.");
     }
 
     [HttpGet]

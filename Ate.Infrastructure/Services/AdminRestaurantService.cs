@@ -1,3 +1,4 @@
+using Ate.Application.Common.Storage;
 using Ate.Application.Common.Security;
 using System.Globalization;
 using System.Text;
@@ -29,6 +30,8 @@ public class AdminRestaurantService : IAdminRestaurantService, IScopedDependency
     private readonly SmtpOptions _smtpOptions;
     private readonly ILogger<AdminRestaurantService> _logger;
 
+    private readonly ILogoFiles _logoFiles;
+
     public AdminRestaurantService(
         IApplicationDbContext context,
         IPasswordHasher passwordHasher,
@@ -36,7 +39,8 @@ public class AdminRestaurantService : IAdminRestaurantService, IScopedDependency
         IEmailService emailService,
         IOptions<SmtpOptions> smtpOptions,
         ILogger<AdminRestaurantService> logger,
-        ISecurityEventLog securityEvents)
+        ISecurityEventLog securityEvents,
+        ILogoFiles logoFiles)
     {
         _securityEvents = securityEvents;
         _context = context;
@@ -45,6 +49,7 @@ public class AdminRestaurantService : IAdminRestaurantService, IScopedDependency
         _emailService = emailService;
         _smtpOptions = smtpOptions.Value;
         _logger = logger;
+        _logoFiles = logoFiles;
     }
 
     public async Task<Result<IReadOnlyList<AdminRestaurantDto>>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -64,7 +69,7 @@ public class AdminRestaurantService : IAdminRestaurantService, IScopedDependency
 
         IReadOnlyList<AdminRestaurantDto> result = restaurants
             .Select(r => new AdminRestaurantDto(
-                r.Id, r.Code, r.TaxId, r.Name, r.Cuisine, r.Address, r.LogoUrl, r.Latitude, r.Longitude, r.IsActive,
+                r.Id, r.Code, r.TaxId, r.Name, r.Cuisine, r.Address, _logoFiles.ToPublicUrl(r.LogoUrl), r.Latitude, r.Longitude, r.IsActive,
                 agreementCounts.GetValueOrDefault(r.Id), r.CreatedAt))
             .ToList();
 
@@ -141,9 +146,19 @@ public class AdminRestaurantService : IAdminRestaurantService, IScopedDependency
             ReadyMinutes = request.ReadyMinutes,
             Latitude = request.Latitude,
             Longitude = request.Longitude,
-            LogoUrl = string.IsNullOrEmpty(request.Logo) ? null : request.Logo,
             IsActive = true
         };
+
+        if (!string.IsNullOrEmpty(request.Logo))
+        {
+            var logo = await _logoFiles.SaveAsync(request.Logo, LogoFiles.Restaurants, restaurant.Id, cancellationToken);
+            if (logo.IsFailure)
+            {
+                return Result.Failure<CreateRestaurantResponse>(logo.Error);
+            }
+
+            restaurant.LogoUrl = logo.Value;
+        }
 
         _context.Users.Add(user);
         _context.Persons.Add(person);
@@ -155,7 +170,15 @@ public class AdminRestaurantService : IAdminRestaurantService, IScopedDependency
         });
         _context.Restaurants.Add(restaurant);
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            await _logoFiles.DeleteStoredAsync(restaurant.LogoUrl, CancellationToken.None);
+            throw;
+        }
 
         var merchantFullName = $"{person.FirstName} {person.LastName}".Trim();
 
@@ -301,7 +324,7 @@ public class AdminRestaurantService : IAdminRestaurantService, IScopedDependency
     private static string? NullIfBlank(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static AdminRestaurantDto ToDto(Restaurant restaurant, int activeAgreements) =>
+    private AdminRestaurantDto ToDto(Restaurant restaurant, int activeAgreements) =>
         new(
             restaurant.Id,
             restaurant.Code,
@@ -309,7 +332,7 @@ public class AdminRestaurantService : IAdminRestaurantService, IScopedDependency
             restaurant.Name,
             restaurant.Cuisine,
             restaurant.Address,
-            restaurant.LogoUrl,
+            _logoFiles.ToPublicUrl(restaurant.LogoUrl),
             restaurant.Latitude,
             restaurant.Longitude,
             restaurant.IsActive,

@@ -21,6 +21,8 @@ public interface IApplicationDbContext
     DbSet<CompanyRestaurantAgreement> CompanyRestaurantAgreements { get; }
     DbSet<AchievementDefinition> AchievementDefinitions { get; }
     DbSet<UserAchievement> UserAchievements { get; }
+    DbSet<RestaurantBadgeDefinition> RestaurantBadgeDefinitions { get; }
+    DbSet<RestaurantBadge> RestaurantBadges { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

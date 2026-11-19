@@ -62,3 +62,6 @@ pnpm-debug.log*
 
 # NuGet package caches created inside the repo
 .nuget/
+
+# Archivos del almacenamiento local (Storage:Provider=Local)
+Ate.Api/storage/

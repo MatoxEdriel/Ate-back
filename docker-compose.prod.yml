@@ -44,6 +44,12 @@ services:
       - Security__EnforceHttps=true
       # Red interna de Docker donde vive el proxy que agrega X-Forwarded-For / X-Forwarded-Proto.
       - ForwardedHeaders__KnownNetworks__0=${PROXY_NETWORK:-172.16.0.0/12}
+      # Almacenamiento de archivos (docs/almacenamiento/README.md). Local = volumen persistente de abajo.
+      - Storage__Provider=${STORAGE_PROVIDER:-Local}
+      - Storage__PublicBaseUrl=${STORAGE_PUBLIC_BASE_URL:?Define STORAGE_PUBLIC_BASE_URL (ej. https://api.ate.com/files)}
+      - Storage__Local__RootPath=/app/storage
+    volumes:
+      - api_storage:/app/storage
     depends_on:
       - postgres
       - mongo
@@ -51,3 +57,4 @@ services:
 volumes:
   postgres_ate_data:
   mongo_ate_data:
+  api_storage:

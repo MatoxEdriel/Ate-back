@@ -33,7 +33,10 @@ try
             policy.WithOrigins(allowedOrigins)
                   .AllowAnyHeader()
                   .AllowAnyMethod()
-                  .AllowCredentials();
+                  .AllowCredentials()
+                  .WithExposedHeaders(
+                      Ate.Application.Common.Tracing.RequestTrace.HeaderName,
+                      Ate.Api.Filters.IdempotentAttribute.ReplayedHeader);
         });
     });
 
@@ -41,7 +44,9 @@ try
     builder.WebHost.ConfigureKestrel(options => options.Limits.MaxRequestBodySize = 2 * 1024 * 1024);
 
     builder.Services.AddControllers(options =>
-        options.Filters.Add<Ate.Api.Filters.PasswordChangeRequiredFilter>());
+            options.Filters.Add<Ate.Api.Filters.PasswordChangeRequiredFilter>())
+        .ConfigureApiBehaviorOptions(options =>
+            options.InvalidModelStateResponseFactory = Ate.Api.Extensions.InvalidRequestResponse.Create);
     builder.Services.AddApiServices(builder.Configuration);
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
@@ -71,6 +76,8 @@ try
     var enforceHttps = builder.Configuration.GetValue<bool>("Security:EnforceHttps");
 
     var app = builder.Build();
+
+    app.UseMiddleware<Ate.Api.Middlewares.TraceIdMiddleware>();
 
     if (useForwardedHeaders)
     {

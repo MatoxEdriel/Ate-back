@@ -20,7 +20,8 @@ public record EmployeeOrderDto(
     string DeliveryMode,
     string? DeliveryAddress,
     DateTimeOffset OrderedAt,
-    DateTimeOffset? UpdatedAt);
+    DateTimeOffset? UpdatedAt,
+    bool CanRate);
 
 public record EmployeeOrderItemDto(
     Guid DishId,

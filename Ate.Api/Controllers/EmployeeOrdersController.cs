@@ -1,4 +1,5 @@
 using Ate.Api.Extensions;
+using Ate.Api.Filters;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Common.Models;
 using Ate.Application.Features.EmployeeOrders.DTOs;
@@ -31,6 +32,7 @@ public class EmployeeOrdersController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<EmployeeOrderDto>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<EmployeeOrderDto>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<EmployeeOrderDto>), StatusCodes.Status409Conflict)]
+    [Idempotent]
     public async Task<IActionResult> CreateOrder([FromBody] CreateEmployeeOrderRequest request, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
@@ -73,6 +75,42 @@ public class EmployeeOrdersController : ControllerBase
 
         var result = await _employeeOrderService.GetMyOrderAsync(userId.Value, orderId, cancellationToken);
         return result.ToActionResult(this, "Order retrieved successfully.");
+    }
+
+    [HttpGet("pending-rating")]
+    [EndpointSummary("Get the most recent delivered order the employee has not rated yet")]
+    [EndpointDescription("Returns null when there is nothing to rate. Only orders delivered in the last 7 days; the questions depend on the delivery mode.")]
+    [ProducesResponseType(typeof(ApiResponse<PendingRatingDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetPendingRating(CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return ResultExtensions.ToErrorActionResult<PendingRatingDto>(AuthErrors.InvalidToken, this);
+        }
+
+        var result = await _employeeOrderService.GetPendingRatingAsync(userId.Value, cancellationToken);
+        return result.ToActionResult(this, "Pending rating retrieved successfully.");
+    }
+
+    [HttpPost("{orderId}/rating")]
+    [EndpointSummary("Rate (thumbs up/down per category) or skip a delivered order")]
+    [EndpointDescription("Once per order, up to 7 days after delivery. No free-text comments. Recalculates the restaurant's badges.")]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status409Conflict)]
+    [Idempotent]
+    public async Task<IActionResult> RateOrder(string orderId, [FromBody] RateOrderRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (!userId.HasValue)
+        {
+            return ResultExtensions.ToErrorActionResult(AuthErrors.InvalidToken, this);
+        }
+
+        var result = await _employeeOrderService.RateAsync(userId.Value, orderId, request, cancellationToken);
+        return result.ToActionResult(this, "Order rated successfully.");
     }
 
     [HttpPost("{orderId}/cancel")]

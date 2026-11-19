@@ -3,12 +3,15 @@ using Ate.Application.Common.Constants;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Common.Models;
 using Ate.Application.Features.EmployeeOrders.DTOs;
+using Ate.Application.Features.EmployeeOrders;
 using Ate.Application.Features.Restaurants;
+using Ate.Domain.Constants;
 using Ate.Domain.Common;
 using Ate.Domain.Entities;
 using Ate.Domain.Enums;
 using Ate.Domain.Errors;
 using FluentValidation;
+using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -24,21 +27,31 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
 
     private static readonly string[] CancellableStatuses = [EmployeeOrderStatus.Pending];
 
+
     private readonly IApplicationDbContext _context;
     private readonly IMongoCollection<EmployeeOrder> _orders;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IValidator<CreateEmployeeOrderRequest> _createValidator;
+    private readonly IValidator<RateOrderRequest> _rateValidator;
+    private readonly IRestaurantBadgeService _badgeService;
+    private readonly ILogger<EmployeeOrderService> _logger;
 
     public EmployeeOrderService(
         IApplicationDbContext context,
         IMongoDbContext mongoContext,
         IDateTimeProvider dateTimeProvider,
-        IValidator<CreateEmployeeOrderRequest> createValidator)
+        IValidator<CreateEmployeeOrderRequest> createValidator,
+        IValidator<RateOrderRequest> rateValidator,
+        IRestaurantBadgeService badgeService,
+        ILogger<EmployeeOrderService> logger)
     {
         _context = context;
         _orders = mongoContext.GetCollection<EmployeeOrder>(MongoCollections.EmployeeOrders);
         _dateTimeProvider = dateTimeProvider;
         _createValidator = createValidator;
+        _rateValidator = rateValidator;
+        _badgeService = badgeService;
+        _logger = logger;
     }
 
     public async Task<Result<EmployeeOrderDto>> CreateAsync(Guid userId, CreateEmployeeOrderRequest request, CancellationToken cancellationToken = default)
@@ -263,6 +276,109 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
             : Result.Success(ToDto(updated));
     }
 
+    public async Task<Result> RateAsync(Guid userId, string orderId, RateOrderRequest request, CancellationToken cancellationToken = default)
+    {
+        var validationResult = await _rateValidator.ValidateAsync(request, cancellationToken);
+        if (!validationResult.IsValid)
+        {
+            var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
+            return Result.Failure(Error.Validation(EmployeeOrderErrors.InvalidRating.Code, EmployeeOrderErrors.InvalidRating.Description, errors));
+        }
+
+        if (!ObjectId.TryParse(orderId, out _))
+        {
+            return Result.Failure(EmployeeOrderErrors.NotFound);
+        }
+
+        var order = await _orders
+            .Find(o => o.Id == orderId && o.UserId == userId)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (order == null)
+        {
+            return Result.Failure(EmployeeOrderErrors.NotFound);
+        }
+
+        if (order.Rating != null)
+        {
+            return Result.Failure(EmployeeOrderErrors.AlreadyRated);
+        }
+
+        var now = _dateTimeProvider.UtcNow;
+        if (!PendingRatingSelector.IsWithinWindow(order, now))
+        {
+            return Result.Failure(EmployeeOrderErrors.NotRatable);
+        }
+
+        var answers = request.Answers ?? new Dictionary<string, bool>();
+        if (answers.Keys.Any(category => !RatingCategories.AppliesTo(category, order.DeliveryMode)))
+        {
+            return Result.Failure(EmployeeOrderErrors.InvalidRating);
+        }
+
+        var rating = new EmployeeOrderRating { Answers = answers, Skipped = request.Skipped, RatedAt = now };
+
+        var filter = Builders<EmployeeOrder>.Filter.Eq(o => o.Id, order.Id)
+            & Builders<EmployeeOrder>.Filter.Eq(o => o.UserId, userId)
+            & Builders<EmployeeOrder>.Filter.Exists(o => o.Rating, false);
+        var updated = await _orders.UpdateOneAsync(
+            filter,
+            Builders<EmployeeOrder>.Update.Set(o => o.Rating, rating),
+            cancellationToken: cancellationToken);
+
+        if (updated.ModifiedCount == 0)
+        {
+            return Result.Failure(EmployeeOrderErrors.AlreadyRated);
+        }
+
+        if (!request.Skipped)
+        {
+            await RecalculateBadgesSafelyAsync(order.RestaurantId);
+        }
+
+        return Result.Success();
+    }
+
+    private async Task RecalculateBadgesSafelyAsync(Guid restaurantId)
+    {
+        try
+        {
+            await _badgeService.RecalculateAsync(restaurantId, CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Badge recalculation failed for restaurant {RestaurantId}; the rating was saved.", restaurantId);
+        }
+    }
+
+    public async Task<Result<PendingRatingDto?>> GetPendingRatingAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var now = _dateTimeProvider.UtcNow;
+        var filter = Builders<EmployeeOrder>.Filter.Eq(o => o.UserId, userId)
+            & Builders<EmployeeOrder>.Filter.Eq(o => o.Status, EmployeeOrderStatus.Delivered)
+            & Builders<EmployeeOrder>.Filter.Gte(o => o.OrderedAt, now - PendingRatingSelector.RatingWindow - TimeSpan.FromDays(7));
+
+        var candidates = await _orders.Find(filter)
+            .SortByDescending(o => o.OrderedAt)
+            .Limit(20)
+            .ToListAsync(cancellationToken);
+
+        var order = PendingRatingSelector.Pick(candidates, now);
+
+        PendingRatingDto? pending = order == null
+            ? null
+            : new PendingRatingDto(
+                order.Id,
+                order.RestaurantId,
+                order.RestaurantName,
+                MealTypeCodes.ToCode(order.MealType),
+                order.Items.Select(i => i.Name).ToList(),
+                order.DeliveryMode,
+                RatingQuestions.For(order.DeliveryMode));
+
+        return Result.Success(pending);
+    }
+
     private async Task<Guid?> GetEmployeeIdAsync(Guid userId, CancellationToken cancellationToken)
     {
         return await _context.Employees
@@ -353,6 +469,7 @@ public class EmployeeOrderService : IEmployeeOrderService, IScopedDependency
             order.DeliveryMode,
             order.DeliveryAddress,
             order.OrderedAt,
-            order.UpdatedAt);
+            order.UpdatedAt,
+            order.Rating == null && PendingRatingSelector.IsWithinWindow(order, DateTimeOffset.UtcNow));
     }
 }

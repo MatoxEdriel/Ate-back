@@ -1,3 +1,4 @@
+using Ate.Application.Common.Storage;
 using Ate.Application.Common.Interfaces;
 using System.Globalization;
 using Ate.Application.Features.MerchantRestaurant.DTOs;
@@ -17,14 +18,18 @@ public class MerchantRestaurantService : IMerchantRestaurantService, IScopedDepe
     private readonly IValidator<UpdateMerchantRestaurantRequest> _updateValidator;
     private readonly IPasswordHasher _passwordHasher;
 
+    private readonly ILogoFiles _logoFiles;
+
     public MerchantRestaurantService(
         IApplicationDbContext context,
         IValidator<UpdateMerchantRestaurantRequest> updateValidator,
-        IPasswordHasher passwordHasher)
+        IPasswordHasher passwordHasher,
+        ILogoFiles logoFiles)
     {
         _context = context;
         _updateValidator = updateValidator;
         _passwordHasher = passwordHasher;
+        _logoFiles = logoFiles;
     }
 
     public async Task<Result<MerchantRestaurantDto>> GetAsync(Guid merchantUserId, CancellationToken cancellationToken = default)
@@ -84,15 +89,46 @@ public class MerchantRestaurantService : IMerchantRestaurantService, IScopedDepe
         restaurant.Phone = string.IsNullOrWhiteSpace(request.Phone) ? null : request.Phone.Trim();
         restaurant.BrandColor = request.BrandColor.Trim().ToUpperInvariant();
         restaurant.ReadyMinutes = request.ReadyMinutes;
+        var previousLogo = restaurant.LogoUrl;
         if (request.Logo != null)
         {
-            restaurant.LogoUrl = request.Logo.Length == 0 ? null : request.Logo;
+            if (request.Logo.Length == 0)
+            {
+                restaurant.LogoUrl = null;
+            }
+            else
+            {
+                var logo = await _logoFiles.SaveAsync(request.Logo, LogoFiles.Restaurants, restaurant.Id, cancellationToken);
+                if (logo.IsFailure)
+                {
+                    return Result.Failure<MerchantRestaurantDto>(logo.Error);
+                }
+
+                restaurant.LogoUrl = logo.Value;
+            }
         }
         ApplyCutoff(restaurant, request.Cutoff);
         restaurant.Latitude = request.Latitude.HasValue ? Math.Round(request.Latitude.Value, 6) : null;
         restaurant.Longitude = request.Longitude.HasValue ? Math.Round(request.Longitude.Value, 6) : null;
 
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch
+        {
+            if (restaurant.LogoUrl != previousLogo)
+            {
+                await _logoFiles.DeleteStoredAsync(restaurant.LogoUrl, CancellationToken.None);
+            }
+
+            throw;
+        }
+
+        if (restaurant.LogoUrl != previousLogo)
+        {
+            await _logoFiles.DeleteStoredAsync(previousLogo, CancellationToken.None);
+        }
 
         return Result.Success(ToDto(restaurant));
     }
@@ -111,7 +147,7 @@ public class MerchantRestaurantService : IMerchantRestaurantService, IScopedDepe
             || Normalize(request.Phone) != restaurant.Phone
             || Round(request.Latitude) != restaurant.Latitude
             || Round(request.Longitude) != restaurant.Longitude
-            || (request.Logo != null && (request.Logo.Length == 0 ? null : request.Logo) != restaurant.LogoUrl);
+            || (request.Logo != null && (request.Logo.Length > 0 || restaurant.LogoUrl != null));
     }
 
     private static void ApplyCutoff(Restaurant restaurant, IReadOnlyDictionary<string, string>? cutoff)
@@ -141,14 +177,14 @@ public class MerchantRestaurantService : IMerchantRestaurantService, IScopedDepe
         }
     }
 
-    private static MerchantRestaurantDto ToDto(Restaurant restaurant) => new(
+    private MerchantRestaurantDto ToDto(Restaurant restaurant) => new(
         restaurant.Id,
         restaurant.Name,
         restaurant.Cuisine,
         restaurant.Address,
         restaurant.Phone,
         restaurant.BrandColor,
-        restaurant.LogoUrl,
+        _logoFiles.ToPublicUrl(restaurant.LogoUrl),
         restaurant.ReadyMinutes,
         restaurant.IsActive,
         restaurant.Latitude,

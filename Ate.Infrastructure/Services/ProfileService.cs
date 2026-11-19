@@ -1,3 +1,4 @@
+using Ate.Application.Common.Storage;
 using Ate.Domain.Enums;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Features.Profile.DTOs;
@@ -13,9 +14,12 @@ public class ProfileService : IProfileService, IScopedDependency
 {
     private readonly IApplicationDbContext _context;
 
-    public ProfileService(IApplicationDbContext context)
+    private readonly ILogoFiles _logoFiles;
+
+    public ProfileService(IApplicationDbContext context, ILogoFiles logoFiles)
     {
         _context = context;
+        _logoFiles = logoFiles;
     }
 
     public async Task<Result<ProfileDto>> GetProfileAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -74,7 +78,7 @@ public class ProfileService : IProfileService, IScopedDependency
         return Result.Success(profile);
     }
 
-    private static ProfileCompanyDto? ToCompanyDto(Company? company, bool includeDetails)
+    private ProfileCompanyDto? ToCompanyDto(Company? company, bool includeDetails)
     {
         return company == null
             ? null
@@ -86,7 +90,7 @@ public class ProfileService : IProfileService, IScopedDependency
                 includeDetails ? company.Email : null,
                 includeDetails ? company.Phone : null,
                 includeDetails ? company.Address : null,
-                company.LogoUrl,
+                _logoFiles.ToPublicUrl(company.LogoUrl),
                 company.IsActive);
     }
 }

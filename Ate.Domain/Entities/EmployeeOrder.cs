@@ -43,6 +43,8 @@ public class EmployeeOrder
     /// <summary>Copia de la dirección de la empresa al momento del pedido; solo para "entrega".</summary>
     public string? DeliveryAddress { get; set; }
 
+    public EmployeeOrderRating? Rating { get; set; }
+
     public DateTimeOffset OrderedAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
     public DateTimeOffset? UpdatedAt { get; set; }
@@ -61,6 +63,13 @@ public class EmployeeOrderItem
     public bool? WithRice { get; set; }
     public string? Drink { get; set; }
     public string? Notes { get; set; }
+}
+
+public class EmployeeOrderRating
+{
+    public Dictionary<string, bool> Answers { get; set; } = new();
+    public bool Skipped { get; set; }
+    public DateTimeOffset RatedAt { get; set; }
 }
 
 public class EmployeeOrderStatusChange

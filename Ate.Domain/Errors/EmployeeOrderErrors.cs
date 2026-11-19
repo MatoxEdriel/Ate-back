@@ -25,6 +25,15 @@ public static class EmployeeOrderErrors
     public static readonly Error NotFound =
         Error.NotFound("EmployeeOrder.NotFound", "No encontramos este pedido.");
 
+    public static readonly Error NotRatable =
+        Error.Validation("EmployeeOrder.NotRatable", "Solo puedes calificar pedidos entregados en los últimos 7 días.");
+
+    public static readonly Error AlreadyRated =
+        Error.Conflict("EmployeeOrder.AlreadyRated", "Ya calificaste este pedido.");
+
+    public static readonly Error InvalidRating =
+        Error.Validation("EmployeeOrder.InvalidRating", "Responde al menos una pregunta o elige omitir.");
+
     public static readonly Error CannotCancel =
         Error.Conflict("EmployeeOrder.CannotCancel", "Este pedido ya no se puede cancelar.");
 }

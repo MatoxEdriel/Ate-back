@@ -1,5 +1,7 @@
+using Ate.Application.Common.Storage;
 using Ate.Application.Common.Interfaces;
 using Ate.Application.Features.Restaurants;
+using Ate.Application.Features.RestaurantBadges.DTOs;
 using Ate.Application.Features.Restaurants.DTOs;
 using Ate.Domain.Common;
 using Ate.Domain.Entities;
@@ -13,11 +15,19 @@ public class RestaurantService : IRestaurantService, IScopedDependency
 {
     private readonly IApplicationDbContext _context;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly IRestaurantBadgeService _badgeService;
+    private readonly ILogoFiles _logoFiles;
 
-    public RestaurantService(IApplicationDbContext context, IDateTimeProvider dateTimeProvider)
+    public RestaurantService(
+        IApplicationDbContext context,
+        IDateTimeProvider dateTimeProvider,
+        IRestaurantBadgeService badgeService,
+        ILogoFiles logoFiles)
     {
         _context = context;
         _dateTimeProvider = dateTimeProvider;
+        _badgeService = badgeService;
+        _logoFiles = logoFiles;
     }
 
     public async Task<Result<IReadOnlyList<RestaurantDto>>> GetForEmployeeAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -49,11 +59,15 @@ public class RestaurantService : IRestaurantService, IScopedDependency
             .ThenBy(a => a.Restaurant.Name)
             .ToListAsync(cancellationToken);
 
-        IReadOnlyList<RestaurantDto> result = agreements.Select(a => ToDto(a, businessNow)).ToList();
+        var badges = await _badgeService.GetHeldAsync(agreements.Select(a => a.RestaurantId).ToList(), cancellationToken);
+
+        IReadOnlyList<RestaurantDto> result = agreements
+            .Select(a => ToDto(a, businessNow, badges.GetValueOrDefault(a.RestaurantId) ?? []))
+            .ToList();
         return Result.Success(result);
     }
 
-    private static RestaurantDto ToDto(CompanyRestaurantAgreement agreement, DateTimeOffset businessNow)
+    private RestaurantDto ToDto(CompanyRestaurantAgreement agreement, DateTimeOffset businessNow, IReadOnlyList<RestaurantBadgeDto> badges)
     {
         var restaurant = agreement.Restaurant;
 
@@ -85,13 +99,14 @@ public class RestaurantService : IRestaurantService, IScopedDependency
             agreement.DistanceM,
             restaurant.ReadyMinutes,
             restaurant.BrandColor,
-            restaurant.LogoUrl,
+            _logoFiles.ToPublicUrl(restaurant.LogoUrl),
             restaurant.Icon,
             restaurant.Latitude.HasValue && restaurant.Longitude.HasValue
                 ? new RestaurantLocationDto(restaurant.Latitude.Value, restaurant.Longitude.Value)
                 : null,
             cutoff,
             orderingOpen,
-            menu);
+            menu,
+            badges);
     }
 }

@@ -1,3 +1,5 @@
+using Ate.Application.Features.RestaurantBadges.DTOs;
+
 namespace Ate.Application.Features.Restaurants.DTOs;
 
 /// <summary>
@@ -17,7 +19,8 @@ public record RestaurantDto(
     RestaurantLocationDto? Location,
     IReadOnlyDictionary<string, string> Cutoff,
     IReadOnlyDictionary<string, bool> OrderingOpen,
-    IReadOnlyDictionary<string, IReadOnlyList<RestaurantDishDto>> Menu);
+    IReadOnlyDictionary<string, IReadOnlyList<RestaurantDishDto>> Menu,
+    IReadOnlyList<RestaurantBadgeDto> Badges);
 
 public record RestaurantLocationDto(decimal Latitude, decimal Longitude);
 
