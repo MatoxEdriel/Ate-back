@@ -83,6 +83,76 @@ No hay analítica, publicidad ni cookies de terceros propias.
 | Contraseñas | PostgreSQL, solo como hash | Nadie |
 | Correo y nombre al enviar notificaciones | Servidor SMTP de Gmail | Proveedor de correo |
 
+### Por qué la sesión usa una cookie (decisión técnica)
+
+Se decidió en el [plan de refuerzo de seguridad](../security/2026-11-15-plan-refuerzo-seguridad.md), punto 2.4.
+
+**Antes:** el token de acceso y el refresh token se guardaban en `localStorage`. Cualquier JavaScript de la
+página puede leer `localStorage`. Si alguien lograba inyectar un script (XSS, una librería comprometida), se
+llevaba el refresh token y podía usar la cuenta durante semanas desde otra máquina, sin que se pudiera cerrar
+esa sesión.
+
+**Ahora** la sesión tiene dos piezas:
+
+- **Token de acceso (JWT):** solo en memoria, dura 15 minutos y se pierde al recargar.
+- **Refresh token:** en la cookie `ate_rt`, que sirve para pedir un token de acceso nuevo sin volver a
+  escribir la contraseña.
+
+| Atributo de `ate_rt` | Para qué sirve |
+|---|---|
+| `HttpOnly` | El JavaScript no puede leerla. Un XSS no se la puede llevar. |
+| `Secure` | Solo viaja por HTTPS. |
+| `SameSite=Strict` | Otro sitio no puede hacer que el navegador la envíe (protege contra CSRF). |
+| `Path=/api/v1/auth` | Solo se envía a `refresh` y `logout`, no en cada petición. |
+
+Además, el refresh token se guarda en la base como hash SHA-256 y se rota en cada uso. Si alguien reusa uno
+viejo, se cierran todas las sesiones del usuario. También se revoca al cerrar sesión y al cambiar la
+contraseña.
+
+**Lo que no resuelve:** mientras la pestaña está abierta, un XSS todavía puede hacer peticiones como el
+usuario. Lo que se gana es que no se puede llevar una credencial de larga duración. Por eso la CSP del
+frontend sigue siendo necesaria.
+
+**Condición de despliegue:** el frontend y la API deben estar en el mismo sitio (`app.ate.com` y
+`api.ate.com`). Si la API queda en otro dominio, el navegador no envía la cookie y los usuarios pierden la
+sesión cada 15 minutos.
+
+### ¿Hace falta el aviso «Aceptar / Configurar cookies»?
+
+Esos avisos existen porque las normas europeas (y las que las imitan) exigen **consentimiento previo** para
+las cookies que **no** son necesarias para el servicio: analítica (Google Analytics, Hotjar), publicidad
+(píxel de Meta, Google Ads) y rastreo de terceros. El botón «Configurar» sirve para que el usuario apague esas
+categorías.
+
+**Situación de Ate hoy (recomendación técnica, pendiente de validar con un abogado):**
+
+- La única cookie propia es `ate_rt`, que es **de autenticación**. Sin ella no se puede iniciar sesión, así
+  que no tiene sentido ofrecer «Rechazar». En la referencia europea (WP 194) estas cookies están **exentas
+  de consentimiento**.
+- `ate_user` y `theme` en `localStorage` son funcionales: muestran la interfaz y recuerdan el modo de color.
+  No rastrean a nadie.
+- No hay analítica ni publicidad.
+
+**Conclusión:** hoy **no hace falta un banner de consentimiento** con «Aceptar / Rechazar / Configurar». Sí
+hace falta **informar** (art. 12 LOPDP):
+
+1. Una sección «Cookies y almacenamiento local» en la política de privacidad, con la tabla de inventario de
+   arriba.
+2. Una línea informativa en el login, sin botones de aceptar. Por ejemplo: *«Usamos una cookie necesaria para
+   mantener tu sesión iniciada. Más información en la Política de privacidad.»*
+
+**Puntos grises a revisar:**
+
+- **Mapa de Google incrustado** (`location-picker`, iframe `maps.google.com/maps?...&output=embed`): al
+  cargarse, Google puede poner **sus propias cookies**. Es el único caso de cookies de terceros. Para
+  evitarlo hay dos opciones: cargar el mapa solo cuando el usuario pulse «Ver mapa», o usar OpenStreetMap
+  como en `location-map-dialog`.
+- **Duración de 30 días:** algunas autoridades europeas solo consideran «necesaria» una cookie de sesión
+  corta. Si el abogado lo pide, se puede agregar una casilla «Mantener sesión iniciada»: sin marcarla, la
+  cookie se borra al cerrar el navegador.
+- **Si algún día se agrega analítica o publicidad**, el banner sí pasa a ser necesario. Además, esos
+  scripts no deben cargarse hasta que el usuario acepte.
+
 ## 7. Puntos a considerar de la LOPDP (lista de trabajo)
 
 Cada punto se revisa contra el texto oficial antes de darse por cumplido.
@@ -94,7 +164,7 @@ Cada punto se revisa contra el texto oficial antes de darse por cumplido.
 | 3 | **Responsable y encargado** | ¿Quién es el responsable del tratamiento: Ate, la empresa cliente, ambos? Define quién firma qué | Por decidir |
 | 4 | **Delegado de protección de datos** | ¿Hay obligación de designarlo según el volumen o tipo de datos? | Por confirmar |
 | 5 | **Derechos del titular** | Acceso, rectificación, eliminación, oposición, portabilidad, etc. ¿Hay un canal y un procedimiento con plazos? | Pendiente |
-| 6 | **Cookies y almacenamiento local** | Aviso de la cookie de sesión y del `localStorage`; evaluar si requiere consentimiento | Por confirmar |
+| 6 | **Cookies y almacenamiento local** | Aviso de la cookie de sesión y del `localStorage`. Recomendación técnica: solo aviso informativo, sin banner de consentimiento (ver sección 6). Revisar el iframe de Google Maps | Por confirmar con el abogado |
 | 7 | **Terceros y transferencias internacionales** | La base de datos de desarrollo está en Supabase (región us-west-2, EE. UU.); correo vía Gmail; mapas y fuentes de Google/Esri. ¿Qué exige la ley para transferir datos fuera del país? | Por confirmar |
 | 8 | **Contratos con encargados** | Cláusulas de protección de datos con hosting, correo y proveedores (ver resolución SPDP-SPD-2025-0006-R) | Pendiente |
 | 9 | **Seguridad** | Medidas técnicas y organizativas. Ver [plan de refuerzo de seguridad](../security/2026-11-15-plan-refuerzo-seguridad.md) | En curso |
